@@ -89,6 +89,29 @@ describe("validatePreservation", () => {
     expect(validatePreservation(["only use pnpm"], "use npm").ok).toBe(false);
     expect(validatePreservation(["at most 3 retries"], "retry freely").ok).toBe(false);
   });
+
+  it("does not treat $50 as preserved inside $500", () => {
+    const lost = validatePreservation(["budget $50"], "budget $500 for the quarter");
+    expect(lost.ok).toBe(false);
+    expect(lost.lostConstraints).toEqual(["budget $50"]);
+
+    const ellipsis = validatePreservation(["budget $50"], "budget $500…");
+    expect(ellipsis.ok).toBe(false);
+
+    const kept = validatePreservation(["budget $50"], "budget $50 for the quarter");
+    expect(kept.ok).toBe(true);
+    expect(kept.preservedConstraints).toEqual(["budget $50"]);
+
+    const embedded = validatePreservation(["budget $50"], "keep the budget $50 cap");
+    expect(embedded.ok).toBe(true);
+
+    const later = validatePreservation(["budget $50"], "budget $500 or budget $50");
+    expect(later.ok).toBe(true);
+
+    expect(validatePreservation(["budget $50"], "budget $50.00 for the quarter").ok).toBe(false);
+    expect(validatePreservation(["at most 3"], "at most 30").ok).toBe(false);
+    expect(validatePreservation(["at most 3"], "at most 3 retries").ok).toBe(true);
+  });
 });
 
 describe("extractHardConstraints", () => {

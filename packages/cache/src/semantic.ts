@@ -25,7 +25,10 @@
  * but not identical wording can still reuse a cached answer. Numerals, math
  * operators, currency amounts, and negation tokens stay in that key. A hit is
  * refused when those sequences differ, even if the remaining words would clear
- * the Jaccard threshold. False negatives are preferable to dangerous false positives.
+ * the Jaccard threshold. Bare operator tokens with no digits (`+` vs `*`) are
+ * critical literals as well: punctuation stripping would otherwise leave only
+ * the shared words, and Jaccard would report a hit. False negatives are
+ * preferable to dangerous false positives.
  */
 import { sha256 } from "@grokmax/core";
 import type { GrokMaxTask } from "@grokmax/core";
@@ -123,6 +126,14 @@ export function significantTokens(text: string): string[] {
 export interface CriticalLiterals {
   numbers: string[];
   mathShapes: string[];
+  /**
+   * Whitespace-delimited math operators in encounter order, including
+   * repetition. Not sorted: `+` then `*` is not the same request as `*` then
+   * `+`. Operators that sit inside a numeric expression (`12 - 4`) are omitted
+   * here because `mathShapes` already records them, so glued and spaced forms
+   * of the same expression stay compatible.
+   */
+  operators: string[];
   currencies: string[];
   percents: string[];
   units: string[];
@@ -177,6 +188,10 @@ export function extractCriticalLiterals(text: string): CriticalLiterals {
       .replace(/\|/g, "");
     if (shape.length >= 3) mathShapes.push(shape);
   }
+
+  // Bare operators (`Use operator +` vs `Use operator *`). Infix operators
+  // already covered by a math expression are left to mathShapes.
+  const operators = extractBareOperators(s);
 
   // Negation and modality words
   const negation = NEGATION_WORDS.filter((w) => new RegExp(`\\b${escapeRe(w)}\\b`).test(low));
@@ -234,7 +249,50 @@ export function extractCriticalLiterals(text: string): CriticalLiterals {
     keywords.push(`${key}:${val}`);
   }
 
-  return { numbers: dedupeSort(numbers), mathShapes: dedupeSort(mathShapes), currencies: dedupeSort(currencies), percents: dedupeSort(percents), units: dedupeSort(units), negation: dedupeSort(negation), modality: dedupeSort(modality), paths: dedupeSort(paths), dotted: dedupeSort(dotted), versions: dedupeSort(versions), urls: dedupeSort(urls), hashes: dedupeSort(hashes), identifiers: dedupeSort(identifiers), keywords: dedupeSort(keywords) };
+  return { numbers: dedupeSort(numbers), mathShapes: dedupeSort(mathShapes), operators, currencies: dedupeSort(currencies), percents: dedupeSort(percents), units: dedupeSort(units), negation: dedupeSort(negation), modality: dedupeSort(modality), paths: dedupeSort(paths), dotted: dedupeSort(dotted), versions: dedupeSort(versions), urls: dedupeSort(urls), hashes: dedupeSort(hashes), identifiers: dedupeSort(identifiers), keywords: dedupeSort(keywords) };
+}
+
+/**
+ * Operators that are their own token. A leading/trailing quote or bracket
+ * does not hide them (`(+)`, `+,`). Digit-glued forms (`7*8`, `-5`) are not
+ * bare. Infix operators inside a matched numeric expression are omitted so
+ * `12 - 4` and `12-4` stay compatible; anything expr-matching does not cover
+ * (`+` alone, `++`, `**`) is kept in order.
+ */
+function extractBareOperators(text: string): string[] {
+  const exprRe = /[-+]?\d+(?:\.\d+)?(?:\s*(?:[+\-*/%^])\s*[-+]?\d+(?:\.\d+)?)+/g;
+  const covered: boolean[] = Array.from({ length: text.length }, () => false);
+  for (const m of text.matchAll(exprRe)) {
+    const start = m.index ?? 0;
+    const raw = m[0] ?? "";
+    for (let i = start; i < start + raw.length; i += 1) covered[i] = true;
+  }
+
+  const operators: string[] = [];
+  for (const m of text.matchAll(/\S+/g)) {
+    const tok = m[0] ?? "";
+    const op = bareOperatorToken(tok);
+    if (!op) continue;
+    const start = m.index ?? 0;
+    let insideExpr = tok.length > 0;
+    for (let i = start; i < start + tok.length; i += 1) {
+      if (!covered[i]) {
+        insideExpr = false;
+        break;
+      }
+    }
+    if (insideExpr) continue;
+    operators.push(op);
+  }
+  return operators;
+}
+
+const BARE_OPERATOR_TOKEN = /^[*+/%^×÷-]+$/;
+
+function bareOperatorToken(token: string): string | null {
+  const core = token.replace(/^[\s`'“”"'([{]+/u, "").replace(/[\s`'“”"'.,;:!?)\]]+$/u, "");
+  if (!BARE_OPERATOR_TOKEN.test(core)) return null;
+  return core;
 }
 
 export function criticalLiteralsCompatible(a: string, b: string): boolean {
@@ -243,6 +301,7 @@ export function criticalLiteralsCompatible(a: string, b: string): boolean {
   return (
     sameList(A.numbers, B.numbers) &&
     sameList(A.mathShapes, B.mathShapes) &&
+    sameList(A.operators, B.operators) &&
     sameList(A.currencies, B.currencies) &&
     sameList(A.percents, B.percents) &&
     sameList(A.units, B.units) &&

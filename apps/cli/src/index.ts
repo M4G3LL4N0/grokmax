@@ -447,10 +447,11 @@ async function main(): Promise<void> {
       const cache = openCache(flags);
       try {
         const registry: ProviderRegistry = createDefaultRegistry();
+        const { benchmarkFixturesPresent } = await import("./benchmark.js");
         const res = await runDoctor({
           cache,
           providerDetect: () => registry.detectSet(),
-          benchmarkFixturesPresent: flags.cwd.endsWith("grokmax")
+          benchmarkFixturesPresent: benchmarkFixturesPresent(flags.cwd)
         });
         if (flags.json) {
           console.log(JSON.stringify(res, null, 2));
@@ -477,8 +478,9 @@ async function main(): Promise<void> {
       try {
         const ledger = new Ledger(cache.store);
         const registry: ProviderRegistry = createDefaultRegistry();
+        const { benchmarkFixturesPresent } = await import("./benchmark.js");
         const [doctor, report] = await Promise.all([
-          runDoctor({ cache, providerDetect: () => registry.detectSet(), benchmarkFixturesPresent: true }),
+          runDoctor({ cache, providerDetect: () => registry.detectSet(), benchmarkFixturesPresent: benchmarkFixturesPresent(flags.cwd) }),
           computeSavings(cache, ledger)
         ]);
         if (flags.json) {

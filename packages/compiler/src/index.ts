@@ -132,9 +132,11 @@ export function compile(opts: CompileInput): CompiledPrompt {
 
 /**
  * Preservation check. A constraint is kept only when its full text survives in
- * the prompt and every significant token does too. Negation and obligation
- * words (`not`, `never`, `must`, `only`, `do`) are mandatory — they are not
- * stopwords. This means "deploy" alone can never satisfy "do not deploy".
+ * the prompt at a token boundary and every significant token does too.
+ * Substring containment is not enough: `$50` is not preserved by `$500`, and
+ * `3` is not preserved by `30`. Negation and obligation words (`not`, `never`,
+ * `must`, `only`, `do`) are mandatory — they are not stopwords. This means
+ * "deploy" alone can never satisfy "do not deploy".
  */
 export function validatePreservation(
   constraints: string[],
@@ -148,8 +150,8 @@ export function validatePreservation(
   for (const c of constraints) {
     const norm = normalizeForPreservation(c);
     const tokens = significant(c);
-    const verbatimMissing = norm.length > 0 && !promptNorm.includes(norm);
-    const misses = tokens.filter((t) => !promptNorm.includes(t));
+    const verbatimMissing = norm.length > 0 && !containsAtTokenBoundary(promptNorm, norm);
+    const misses = tokens.filter((t) => !containsAtTokenBoundary(promptNorm, t));
     if (!verbatimMissing && misses.length === 0) {
       preservedConstraints.push(c);
     } else {
@@ -160,6 +162,48 @@ export function validatePreservation(
   }
 
   return { ok: lostConstraints.length === 0, issues, preservedConstraints, lostConstraints };
+}
+
+/**
+ * True when `needle` occurs in `haystack` without being a prefix or infix of a
+ * longer literal. Digits, letters, `_`, a following `%` or apostrophe, and a
+ * decimal/thousands continuation (`.5`, `,000`) all extend the literal, so
+ * `$50` does not match inside `$500` or `$50.00`.
+ */
+function containsAtTokenBoundary(haystack: string, needle: string): boolean {
+  if (needle.length === 0) return false;
+  let from = 0;
+  while (from <= haystack.length - needle.length) {
+    const i = haystack.indexOf(needle, from);
+    if (i < 0) return false;
+    if (!matchExtendsLiteral(haystack, i, i + needle.length)) return true;
+    from = i + 1;
+  }
+  return false;
+}
+
+function matchExtendsLiteral(haystack: string, start: number, end: number): boolean {
+  if (start > 0) {
+    const before = haystack[start - 1];
+    if (before !== undefined && isLiteralBody(before)) return true;
+  }
+  return literalContinues(haystack, end);
+}
+
+function isLiteralBody(ch: string): boolean {
+  return /[\p{L}\p{N}_]/u.test(ch);
+}
+
+function literalContinues(haystack: string, index: number): boolean {
+  const ch = haystack[index];
+  if (ch === undefined) return false;
+  if (isLiteralBody(ch)) return true;
+  if (ch === "%" || ch === "'" || ch === "’") return true;
+  if (ch === "." || ch === ",") {
+    const next = haystack[index + 1];
+    return next !== undefined && /\d/u.test(next);
+  }
+  return false;
 }
 
 function normalizeForPreservation(s: string): string {

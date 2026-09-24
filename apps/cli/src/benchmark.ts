@@ -51,6 +51,38 @@ export interface BenchmarkReport {
 
 const SUITE_DIR = "benchmarks/suites";
 
+/**
+ * True when `cwd` contains at least one `benchmarks/suites/<suite>/*.json`.
+ * The directory basename is irrelevant — a clone named `grokmax-verify` still
+ * counts. An empty or missing suites directory does not.
+ */
+export function benchmarkFixturesPresent(cwd: string): boolean {
+  const suitesRoot = resolve(cwd, SUITE_DIR);
+  if (!existsSync(suitesRoot)) return false;
+  let entries: string[];
+  try {
+    entries = readdirSync(suitesRoot);
+  } catch {
+    return false;
+  }
+  for (const entry of entries) {
+    const dir = join(suitesRoot, entry);
+    try {
+      if (!statSync(dir).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    let files: string[];
+    try {
+      files = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    if (files.some((f) => f.endsWith(".json"))) return true;
+  }
+  return false;
+}
+
 function loadFixtures(suiteDir: string): BenchmarkFixture[] {
   const files = readdirSync(suiteDir).filter((f) => f.endsWith(".json")).sort();
   const fixtures: BenchmarkFixture[] = [];
