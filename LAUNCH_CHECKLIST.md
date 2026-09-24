@@ -19,10 +19,13 @@ Sunday night checklist for the Monday social launch of GrokMax.
 
 ## Website (grokmax-website, separate repo)
 
-- [ ] Next.js repo scaffolded
-- [ ] OG/social assets wired (assets/grokmax-og.png 1200x630, social card 1080x1080)
-- [ ] Vercel deploy to https://grokmax.noaerth.com (basic-plan protection DISABLED so the link is shared publicly)
-- [ ] Check title/meta/OG on live URL
+- [x] Next.js repo scaffolded
+- [x] OG/social assets wired (assets/grokmax-og.png 1200x630, social card 1080x1080)
+- [x] Vercel deploy to https://grokmax.noaerth.com: production READY, domain attached + verified
+- [x] Check title/meta/OG on live URL
+- [ ] DNS record at Namecheap (A grokmax.noaerth.com -> 76.76.21.21) so the custom domain actually resolves — vercel.app URLs stay behind Vercel's Hobby login wall until then
+- [ ] Confirm https://grokmax.noaerth.com serves the site publicly once DNS propagates
+- [ ] Check title/meta/OG on the public URL
 
 ## Social assets
 
