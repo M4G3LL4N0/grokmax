@@ -70,6 +70,13 @@ describe("validatePreservation", () => {
     expect(r.ok).toBe(false);
     expect(r.issues.length).toBeGreaterThan(0);
   });
+
+  it("rejects a constraint whose negation was stripped", () => {
+    const r = validatePreservation(["do not deploy"], "deploy the service now");
+    expect(r.ok).toBe(false);
+    expect(r.lostConstraints).toEqual(["do not deploy"]);
+    expect(r.preservedConstraints).toEqual([]);
+  });
 });
 
 describe("extractHardConstraints", () => {

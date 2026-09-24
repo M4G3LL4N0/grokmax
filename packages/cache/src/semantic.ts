@@ -9,12 +9,14 @@
  *   compatible dependencies (dependency fingerprint unchanged)
  *   confidence above threshold
  *   no explicit requireFresh
+ *   identical ordered numeric/amount/operator literals and negation tokens
  *
  * The intent_hash is used only for deduplication (PRIMARY KEY). Similarity is
  * computed over recently-stored entries by significant-token Jaccard, so near
- * but not identical wording can still reuse a cached answer.
- *
- * False negatives are preferable to dangerous false positives.
+ * but not identical wording can still reuse a cached answer. Numerals, math
+ * operators, currency amounts, and negation tokens stay in that key. A hit is
+ * refused when those sequences differ, even if the remaining words would clear
+ * the Jaccard threshold. False negatives are preferable to dangerous false positives.
  */
 import { sha256 } from "@grokmax/core";
 import type { GrokMaxTask } from "@grokmax/core";
@@ -41,14 +43,109 @@ interface SemanticRow {
 const DEFAULT_SEMANTIC_THRESHOLD = 0.85;
 const SCAN_WINDOW = 2000;
 
+const STOP = new Set([
+  "please", "the", "and", "with", "for", "you", "your", "this", "that", "can", "could", "would",
+  "give", "need", "want", "should", "from", "into", "about", "where", "when", "what", "have",
+  "been", "will", "are", "was", "were", "does"
+]);
+
+/** Contractions fold to the negation they express. Distinct negations stay distinct. */
+const NEGATION_CANON: Readonly<Record<string, string>> = {
+  dont: "not",
+  cant: "not",
+  wont: "not",
+  isnt: "not",
+  arent: "not",
+  wasnt: "not",
+  werent: "not",
+  hasnt: "not",
+  havent: "not",
+  hadnt: "not",
+  shouldnt: "not",
+  wouldnt: "not",
+  couldnt: "not",
+  mustnt: "not",
+  didnt: "not",
+  doesnt: "not",
+  cannot: "not",
+  not: "not",
+  never: "never",
+  neither: "neither",
+  nobody: "nobody",
+  nothing: "nothing",
+  nowhere: "nowhere",
+  without: "without",
+  none: "none",
+  nor: "nor",
+  no: "no"
+};
+
+interface IntentMarks {
+  tokens: string[];
+  literals: string[];
+  negations: string[];
+}
+
 export function significantTokens(text: string): string[] {
-  const clean = normalizeWhitespace(text.toLowerCase())
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .split(/\s+/)
-    .filter((t) => t.length > 2);
-  const stop = new Set(["please", "the", "and", "with", "for", "you", "your", "this", "that", "can", "could", "would", "give", "need", "want", "should", "from", "into", "about", "where", "when", "what", "have", "been", "will", "not", "are", "was", "were", "does"]);
-  const tokens = clean.filter((t) => !stop.has(t) && !/^\d+$/.test(t));
-  return [...new Set(tokens)];
+  return analyzeIntent(text).tokens;
+}
+
+/**
+ * Ordered numeric/amount/operator literals and negation tokens.
+ * Both sequences must be identical for an L3 hit.
+ */
+function safetyKey(marks: IntentMarks): string {
+  return `${marks.literals.join("\u001f")}\u001e${marks.negations.join("\u001f")}`;
+}
+
+function analyzeIntent(text: string): IntentMarks {
+  const folded = normalizeWhitespace(text.toLowerCase().replace(/[’']/g, ""));
+  const literals: string[] = [];
+  const shielded = folded.replace(literalPattern(), (raw) => {
+    literals.push(canonLiteral(raw));
+    return ` gmlit${literals.length - 1} `;
+  });
+
+  const negations: string[] = [];
+  for (const match of folded.matchAll(negationPattern())) {
+    const word = match[1];
+    if (!word) continue;
+    negations.push(NEGATION_CANON[word] ?? word);
+  }
+
+  const tokens: string[] = [];
+  for (const part of shielded.split(/\s+/)) {
+    if (!part) continue;
+    const lit = /^gmlit(\d+)$/.exec(part);
+    if (lit) {
+      const value = literals[Number(lit[1])];
+      if (value) tokens.push(value);
+      continue;
+    }
+    const negation = NEGATION_CANON[part];
+    if (negation) {
+      tokens.push(negation);
+      continue;
+    }
+    if (part.length <= 2 || STOP.has(part)) continue;
+    tokens.push(part);
+  }
+
+  return { tokens: [...new Set(tokens)], literals, negations };
+}
+
+function literalPattern(): RegExp {
+  // Currency amounts, percents, and math expressions. Operators stay attached
+  // so `7*8`, `50+1`, and `500+1` are different keys, as are `$50` and `$500`.
+  return /(?<![\p{L}\d])(?:[$€£¥]\s*)?[+-]?\d+(?:[.,]\d+)*(?:\s*%|(?:\s*[*/=^×÷+-]\s*(?:[$€£¥]\s*)?[+-]?\d+(?:[.,]\d+)*(?:\s*%)?)*)*/gu;
+}
+
+function canonLiteral(raw: string): string {
+  return raw.replace(/\s+/g, "").replace(/,/g, "").replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-");
+}
+
+function negationPattern(): RegExp {
+  return /\b(dont|cant|wont|cannot|isnt|arent|wasnt|werent|hasnt|havent|hadnt|shouldnt|wouldnt|couldnt|mustnt|didnt|doesnt|never|neither|nobody|nothing|nowhere|without|none|nor|not|no)\b/g;
 }
 
 function jaccard(a: string[], b: string[]): number {
@@ -102,15 +199,19 @@ export class SemanticCache {
       .prepare("SELECT * FROM semantic_index ORDER BY stored_at DESC LIMIT ?")
       .all(SCAN_WINDOW) as unknown as SemanticRow[];
 
-    const currentTokens = significantTokens(intent);
+    const current = analyzeIntent(intent);
+    const currentKey = safetyKey(current);
     const currentConstraints = new Set<string>((task.constraints ?? []).map(normalizeWhitespace));
     const currentOutput = task.output ?? "answer";
 
     let best: SemanticEntry | null = null;
     for (const row of candidates) {
-      const tokens = significantTokens(row.intent);
-      const conf = jaccard(tokens, currentTokens);
+      const stored = analyzeIntent(row.intent);
+      const conf = jaccard(stored.tokens, current.tokens);
       if (conf < this.threshold) continue;
+      // Refuse the hit when numbers, operators, amounts, or negations differ,
+      // even if the remaining words are identical.
+      if (safetyKey(stored) !== currentKey) continue;
 
       if (row.expires_at != null && Date.now() > row.expires_at) {
         this.store.bump("semantic_expired");
