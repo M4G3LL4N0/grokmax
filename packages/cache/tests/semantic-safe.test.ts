@@ -46,7 +46,9 @@ const THREAT_PAIRS: Array<[string, string]> = [
   ["Run the migrations against /repo/a", "Run the migrations against /repo/b"],
   ["Set version 1.2.0 in package.json", "Set version 1.3.0 in package.json"],
   ["Compute sha256 of hello", "Compute sha256 of world"],
-  ["Use port 8080 for the server", "Use port 9090 for the server"]
+  ["Use port 8080 for the server", "Use port 9090 for the server"],
+  ["Use operator +", "Use operator *"],
+  ["Use + then *", "Use * then +"]
 ];
 
 describe("semantic cache / critical-literal gate is fail-closed", () => {
@@ -85,6 +87,22 @@ describe("semantic cache / critical-literal gate is fail-closed", () => {
     expect(hit).not.toBeNull();
     cache.close();
   });
+
+  it("misses bare + probed as bare * (Gate B)", () => {
+    const cache = new GrokMaxCache(freshDb());
+    const hit = storeAndLookup(cache, "Use operator +", "Use operator *");
+    expect(hit).toBeNull();
+    const same = storeAndLookup(cache, "Use operator +", "Please use operator +");
+    expect(same).not.toBeNull();
+    cache.close();
+  });
+
+  it("still hits a paraphrase of the same spaced expression", () => {
+    const cache = new GrokMaxCache(freshDb());
+    const hit = storeAndLookup(cache, "Calculate 12 - 4", "Please calculate 12 - 4");
+    expect(hit).not.toBeNull();
+    cache.close();
+  });
 });
 
 describe("extractCriticalLiterals", () => {
@@ -118,5 +136,26 @@ describe("extractCriticalLiterals", () => {
     const b = extractCriticalLiterals("Calculate 19*7");
     expect(a.mathShapes).toEqual(b.mathShapes);
     expect(a.numbers).not.toEqual(b.numbers);
+  });
+
+  it("treats bare operators as ordered critical literals and leaves glued math alone", () => {
+    expect(extractCriticalLiterals("Use operator +").operators).toEqual(["+"]);
+    expect(extractCriticalLiterals("Use operator *").operators).toEqual(["*"]);
+    expect(extractCriticalLiterals("Use + then *").operators).toEqual(["+", "*"]);
+    expect(extractCriticalLiterals("Use * then +").operators).toEqual(["*", "+"]);
+    expect(extractCriticalLiterals("Calculate 7*8").operators).toEqual([]);
+    expect(extractCriticalLiterals("Calculate 50+1").operators).toEqual([]);
+    expect(extractCriticalLiterals("Calculate 500+1").operators).toEqual([]);
+    expect(extractCriticalLiterals("Calculate 12 - 4").operators).toEqual([]);
+    expect(extractCriticalLiterals("Calculate 12-4").operators).toEqual([]);
+    expect(extractCriticalLiterals("Calculate 12 ++ 4").operators).toEqual(["++"]);
+    expect(criticalLiteralsCompatible("Calculate 7*8", "Calculate 50+1")).toBe(false);
+    expect(criticalLiteralsCompatible("Calculate 50+1", "Calculate 500+1")).toBe(false);
+    // Glued `12-4` still hides the operand after the operator from the number
+    // scan, so spaced vs glued stays a miss (prefer FN). Infix `-` is not a
+    // second reason: both operator lists are empty.
+    expect(extractCriticalLiterals("Calculate 12-4").numbers).toEqual(["12"]);
+    expect(criticalLiteralsCompatible("Calculate 12 - 4", "Calculate 12-4")).toBe(false);
+    expect(criticalLiteralsCompatible("Calculate 12 ++ 4", "Calculate 12 + 4")).toBe(false);
   });
 });
