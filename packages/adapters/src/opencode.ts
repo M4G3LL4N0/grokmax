@@ -14,7 +14,13 @@ export type OpenCodeOptions = {
   timeoutMs?: number;
 };
 
-type OpenCodeRun = { stdout: string; stderr: string; timedOut: boolean };
+type OpenCodeRun = {
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  exitCode: number | null;
+  spawnError: string | null;
+};
 
 export class OpenCodeProvider implements Provider<OpenCodeOptions> {
   readonly id = "opencode" as const;
@@ -51,6 +57,22 @@ export class OpenCodeProvider implements Provider<OpenCodeOptions> {
         evidence: [],
         grokbotRequired: false,
         tokensEstimate: compiled.tokensEstimate
+      };
+    }
+
+    if (result.spawnError || result.exitCode !== 0) {
+      const why = result.spawnError
+        ? `opencode failed to start: ${result.spawnError}`
+        : `opencode exited with code ${result.exitCode ?? "unknown"}`;
+      const detail = (result.stderr.trim() || result.stdout.trim()).slice(0, 500);
+      return {
+        status: "failure",
+        executor: "opencode",
+        summary: detail ? `${why}: ${detail}` : why,
+        evidence: [],
+        grokbotRequired: false,
+        tokensEstimate: compiled.tokensEstimate,
+        rawOutput: result.stdout.slice(0, 8000)
       };
     }
 
@@ -93,10 +115,17 @@ function checkBin(bin: string): boolean {
 
 function runSpawn(bin: string, args: string[], opts: { cwd: string; timeoutMs: number }): Promise<OpenCodeRun> {
   return new Promise<OpenCodeRun>((resolve) => {
-    const child = spawn(bin, args, { cwd: opts.cwd });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let settled = false;
+    const child = spawn(bin, args, { cwd: opts.cwd });
+    const finish = (exitCode: number | null, spawnError: string | null): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ stdout, stderr, timedOut, exitCode, spawnError });
+    };
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
@@ -107,12 +136,8 @@ function runSpawn(bin: string, args: string[], opts: { cwd: string; timeoutMs: n
     child.stderr?.on("data", (d: Buffer) => {
       stderr += d.toString();
     });
-    const done = (): void => {
-      clearTimeout(timer);
-      resolve({ stdout, stderr, timedOut });
-    };
-    child.on("error", done);
-    child.on("close", done);
+    child.on("error", (err: Error) => finish(null, err.message));
+    child.on("close", (code) => finish(code, null));
   });
 }
 

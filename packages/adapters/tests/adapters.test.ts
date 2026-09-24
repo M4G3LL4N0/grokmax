@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { DeterministicProvider, evaluate, createDefaultRegistry, ChatGPTProvider, GrokBotProvider, OpenCodeProvider, ApiProvider } from "@grokmax/adapters";
 import { SimpleRegistry } from "@grokmax/providers";
 import type { CompiledPrompt, GrokMaxTask } from "@grokmax/core";
@@ -95,6 +98,53 @@ describe("createDefaultRegistry composition", () => {
     // deterministic always present; others depend on environment
     expect(set.has("deterministic")).toBe(true);
     expect(set.has("api")).toBe(false); // no endpoint configured
+  });
+});
+
+const fakeBins: string[] = [];
+
+function fakeOpenCode(script: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "grokmax-opencode-"));
+  fakeBins.push(dir);
+  const bin = join(dir, "opencode");
+  writeFileSync(bin, `#!${process.execPath}\n${script}\n`);
+  chmodSync(bin, 0o755);
+  return bin;
+}
+
+afterEach(() => {
+  for (const dir of fakeBins) rmSync(dir, { recursive: true, force: true });
+  fakeBins.length = 0;
+});
+
+describe("OpenCodeProvider process status", () => {
+  it("reports success when the process exits 0", async () => {
+    const bin = fakeOpenCode(`process.stdout.write("opencode ok\\n"); process.exit(0);`);
+    const r = await new OpenCodeProvider({ bin }).execute(prompt, mathTask("inspect the repo"));
+    expect(r.status).toBe("success");
+    expect(r.summary).toContain("opencode ok");
+  });
+
+  it("reports failure on a non-zero exit even when stdout is present", async () => {
+    const bin = fakeOpenCode(`process.stdout.write("7*8 = 56\\n"); process.exit(7);`);
+    const r = await new OpenCodeProvider({ bin }).execute(prompt, mathTask("inspect the repo"));
+    expect(r.status).toBe("failure");
+    expect(r.summary).toMatch(/exit|code 7|7/i);
+    expect(r.evidence.join(" ")).not.toMatch(/completed/i);
+  });
+
+  it("does not treat a success JSON payload as success when the process exits non-zero", async () => {
+    const bin = fakeOpenCode(
+      `process.stdout.write(${JSON.stringify(JSON.stringify({ status: "success", message: "opencode completed" }))}); process.exit(7);`
+    );
+    const r = await new OpenCodeProvider({ bin }).execute(prompt, mathTask("inspect the repo"));
+    expect(r.status).toBe("failure");
+  });
+
+  it("reports failure when the binary cannot be spawned", async () => {
+    const r = await new OpenCodeProvider({ bin: join(tmpdir(), "grokmax-missing-opencode-bin") }).execute(prompt, mathTask("inspect the repo"));
+    expect(r.status).toBe("failure");
+    expect(r.summary).toMatch(/fail|error|spawn|enoent/i);
   });
 });
 

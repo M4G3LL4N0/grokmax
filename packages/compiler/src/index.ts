@@ -131,38 +131,45 @@ export function compile(opts: CompileInput): CompiledPrompt {
 }
 
 /**
- * Semantic-equivalence check: every significant token of every hard constraint
- * must appear in the compiled prompt. If the compiler ever drops a constraint's
- * meaning, this flags it.
+ * Preservation check. A constraint is kept only when its full text survives in
+ * the prompt and every significant token does too. Negation and obligation
+ * words (`not`, `never`, `don't`, `must`, `only`, `do`) are mandatory — they
+ * are not stopwords.
  */
 export function validatePreservation(
   constraints: string[],
   prompt: string
 ): { ok: boolean; issues: string[]; preservedConstraints: string[]; lostConstraints: string[] } {
-  const promptNorm = prompt.replace(/\s+/g, " ").toLowerCase();
+  const promptNorm = normalizeForPreservation(prompt);
   const preservedConstraints: string[] = [];
   const lostConstraints: string[] = [];
   const issues: string[] = [];
 
   for (const c of constraints) {
+    const norm = normalizeForPreservation(c);
     const tokens = significant(c);
+    const verbatimMissing = norm.length > 0 && !promptNorm.includes(norm);
     const misses = tokens.filter((t) => !promptNorm.includes(t));
-    if (misses.length === 0) {
+    if (!verbatimMissing && misses.length === 0) {
       preservedConstraints.push(c);
     } else {
       lostConstraints.push(c);
-      issues.push(`constraint '${c}' lost tokens: ${misses.join(", ")}`);
+      if (verbatimMissing) issues.push(`constraint '${c}' not preserved verbatim`);
+      if (misses.length > 0) issues.push(`constraint '${c}' lost tokens: ${misses.join(", ")}`);
     }
   }
 
   return { ok: lostConstraints.length === 0, issues, preservedConstraints, lostConstraints };
 }
 
+function normalizeForPreservation(s: string): string {
+  return s.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function significant(c: string): string[] {
-  const stop = new Set(["the", "and", "for", "you", "your", "this", "that", "with", "only", "an", "a", "to", "of", "in", "on", "by", "at", "must", "not", "do", "are", "is", "be", "will"]);
-  return c
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+  const stop = new Set(["the", "and", "for", "you", "your", "this", "that", "with", "an", "a", "to", "of", "in", "on", "by", "at", "are", "is", "be", "will"]);
+  return normalizeForPreservation(c)
+    .replace(/[^\p{L}\p{N}\s']/gu, " ")
     .split(/\s+/)
     .filter((t) => t.length > 1 && !stop.has(t));
 }

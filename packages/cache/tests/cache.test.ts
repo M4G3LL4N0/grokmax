@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { GrokMaxCache, openStore, SqliteStore } from "@grokmax/cache";
+import { GrokMaxCache, openStore, significantTokens, SqliteStore } from "@grokmax/cache";
 import type { CacheItem } from "@grokmax/core";
 
 let dirs: string[] = [];
@@ -127,6 +127,139 @@ describe("GrokMaxCache / L3 semantic", () => {
     c.storeSemantic([{ intentHash: "idx", key: "nk1", item: item('"x"', Date.now() + 60_000, depFp), score: 1 }], { ...task, freshness: "daily" });
     const fresher = { ...task, freshness: "hourly" as const };
     expect(c.lookupSemantic("write tests for the cache package", fresher, depFp)).toBeNull();
+    c.close();
+  });
+
+  it("keeps numerals, operators, amounts, and negation in the similarity key", () => {
+    expect(significantTokens("Calculate 7*8 and return the integer result")).toContain("7*8");
+    expect(significantTokens("Calculate 50+1 and return the integer result")).toContain("50+1");
+    expect(significantTokens("Calculate 500+1 and return the integer result")).toContain("500+1");
+    expect(significantTokens("Transfer $50 to the vendor")).toContain("$50");
+    expect(significantTokens("Transfer $500 to the vendor")).toContain("$500");
+    expect(significantTokens("Do not deploy the service")).toContain("not");
+    expect(significantTokens("Don't deploy the service")).toContain("not");
+    expect(significantTokens("Never deploy the service")).toContain("never");
+  });
+
+  it("does not reuse 7*8 for 50+1 or 500+1", () => {
+    const c = new GrokMaxCache(freshDb());
+    const stored = {
+      intent: "Calculate 7*8 and return the integer result",
+      goal: "math",
+      constraints: [] as string[],
+      freshness: "hourly" as const
+    };
+    const depFp = c.dependencyFingerprint(stored);
+    c.storeSemantic(
+      [{ intentHash: "idx", key: "nk1", item: item("7*8 = 56", Date.now() + 60_000, depFp), score: 1 }],
+      stored
+    );
+
+    const fifty = { ...stored, intent: "Calculate 50+1 and return the integer result" };
+    const fiveHundred = { ...stored, intent: "Calculate 500+1 and return the integer result" };
+    expect(c.lookupSemantic(fifty.intent, fifty, depFp)).toBeNull();
+    expect(c.lookupSemantic(fiveHundred.intent, fiveHundred, depFp)).toBeNull();
+
+    c.storeSemantic(
+      [{ intentHash: "idx2", key: "nk2", item: item("500+1 = 501", Date.now() + 60_000, depFp), score: 1 }],
+      fiveHundred
+    );
+    expect(c.lookupSemantic(fifty.intent, fifty, depFp)).toBeNull();
+    c.close();
+  });
+
+  it("still reuses a paraphrase of the same arithmetic expression", () => {
+    const c = new GrokMaxCache(freshDb());
+    const stored = {
+      intent: "Calculate 7*8 and return the integer result",
+      goal: "math",
+      constraints: [] as string[],
+      freshness: "hourly" as const
+    };
+    const depFp = c.dependencyFingerprint(stored);
+    c.storeSemantic(
+      [{ intentHash: "idx", key: "nk1", item: item("7*8 = 56", Date.now() + 60_000, depFp), score: 1 }],
+      stored
+    );
+    const hit = c.lookupSemantic("Please calculate 7*8 and return the integer result", stored, depFp);
+    expect(hit?.item.result).toBe("7*8 = 56");
+    c.close();
+  });
+
+  it("does not treat a negated deploy as the positive deploy", () => {
+    const c = new GrokMaxCache(freshDb());
+    const negative = {
+      intent: "Do not deploy the service",
+      goal: "ship",
+      constraints: [] as string[],
+      freshness: "hourly" as const
+    };
+    const positive = { ...negative, intent: "Deploy the service" };
+    const depFp = c.dependencyFingerprint(negative);
+    c.storeSemantic(
+      [{ intentHash: "idx", key: "nk1", item: item("skipped deploy", Date.now() + 60_000, depFp), score: 1 }],
+      negative
+    );
+    expect(c.lookupSemantic(positive.intent, positive, depFp)).toBeNull();
+    c.close();
+
+    const onlyPositive = new GrokMaxCache(freshDb());
+    const dep2 = onlyPositive.dependencyFingerprint(positive);
+    onlyPositive.storeSemantic(
+      [{ intentHash: "idx2", key: "nk2", item: item("deployed", Date.now() + 60_000, dep2), score: 1 }],
+      positive
+    );
+    expect(onlyPositive.lookupSemantic(negative.intent, negative, dep2)).toBeNull();
+    expect(onlyPositive.lookupSemantic("Don't deploy the service", { ...negative, intent: "Don't deploy the service" }, dep2)).toBeNull();
+    onlyPositive.close();
+  });
+
+  it("does not collide $50 with $500, including inside a long shared prompt", () => {
+    const c = new GrokMaxCache(freshDb());
+    const fifty = {
+      intent: "Transfer $50 to the vendor",
+      goal: "pay",
+      constraints: [] as string[],
+      freshness: "hourly" as const
+    };
+    const fiveHundred = { ...fifty, intent: "Transfer $500 to the vendor" };
+    const depFp = c.dependencyFingerprint(fifty);
+    c.storeSemantic(
+      [{ intentHash: "idx", key: "nk1", item: item("paid 50", Date.now() + 60_000, depFp), score: 1 }],
+      fifty
+    );
+    expect(c.lookupSemantic(fiveHundred.intent, fiveHundred, depFp)).toBeNull();
+
+    const shared =
+      "Please calculate the quarterly vendor payment and return the integer result for invoice processing across all regions today before sending the approved transfer of";
+    const longFifty = { ...fifty, intent: `${shared} $50` };
+    const longFiveHundred = { ...fifty, intent: `${shared} $500` };
+    c.storeSemantic(
+      [{ intentHash: "idx2", key: "nk2", item: item("paid 50 long", Date.now() + 60_000, depFp), score: 1 }],
+      longFifty
+    );
+    expect(c.lookupSemantic(longFiveHundred.intent, longFiveHundred, depFp)).toBeNull();
+    c.close();
+  });
+
+  it("does not drop a negation buried in an otherwise identical long prompt", () => {
+    const c = new GrokMaxCache(freshDb());
+    const positive = {
+      intent: "Please deploy the production service to the staging environment after the scheduled review meeting with the operations team",
+      goal: "ship",
+      constraints: [] as string[],
+      freshness: "hourly" as const
+    };
+    const negative = {
+      ...positive,
+      intent: "Please do not deploy the production service to the staging environment after the scheduled review meeting with the operations team"
+    };
+    const depFp = c.dependencyFingerprint(positive);
+    c.storeSemantic(
+      [{ intentHash: "idx", key: "nk1", item: item("deployed", Date.now() + 60_000, depFp), score: 1 }],
+      positive
+    );
+    expect(c.lookupSemantic(negative.intent, negative, depFp)).toBeNull();
     c.close();
   });
 });
