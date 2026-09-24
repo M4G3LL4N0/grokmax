@@ -6,9 +6,17 @@
  */
 
 export const HARD_PATTERNS: RegExp[] = [
-  /do not (deploy|publish|push|commit|install|run|start|stop|use|modify|touch|remove|delete|change|break|deploy to prod)/i,
+  /do not (deploy|publish|push|commit|install|run|start|stop|use|modify|touch|remove|delete|change|break|log|print|expose|store)/i,
+  /\bdo not\b/i,
   /never (deploy|publish|push|commit|install|run|stop|use|modify|remove|delete|change)/i,
+  /\bnever\b/i,
+  /\bmust not\b/i,
+  /\b(must|needs? to) (never|not)\b/i,
+  /\bcannot\b|\bcan'?t\b/i,
+  /(will not|won'?t|shall not|shan'?t|should not|shouldn'?t)\b/i,
   /must (not|never|use|keep|preserve|maintain|leave)/i,
+  /\bexactly\b/i,
+  /\bat (least|most)\b/i,
   /only (use|install|run|test|build)/i, // covers "only use pnpm"
   /\b(pnpm|npm|yarn|bun) only\b/i,
   /\buse (pnpm|npm|yarn|bun)\b/i,

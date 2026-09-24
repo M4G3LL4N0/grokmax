@@ -1,10 +1,14 @@
 /**
  * OpenCode CLI adapter: repository inspection & modification work.
  * Invokes `opencode run` with the compiled micro-prompt.
+ *
+ * Subprocess result handling is exit-code aware: a non-zero exit code is a
+ * failure, never silently treated as a success. stdout that merely matches a
+ * "success" word pattern cannot override an actual exit code of 1.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve as pathResolve } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve as pathResolve, sep } from "node:path";
 import type { CompiledPrompt, GrokMaxTask, WorkerResult } from "@grokmax/core";
 import type { Provider } from "@grokmax/providers";
 
@@ -14,11 +18,12 @@ export type OpenCodeOptions = {
   timeoutMs?: number;
 };
 
-type OpenCodeRun = {
+export type OpenCodeRun = {
   stdout: string;
   stderr: string;
   timedOut: boolean;
   exitCode: number | null;
+  signal: NodeJS.Signals | null;
   spawnError: string | null;
 };
 
@@ -37,10 +42,10 @@ export class OpenCodeProvider implements Provider<OpenCodeOptions> {
 
   availableCwd(task: GrokMaxTask): string {
     const override = this.opts.projectDir;
-    if (override) return override;
+    const base = override ?? process.cwd();
     const ctxDir = (task.contextRefs ?? []).find((r) => r.startsWith("/") || r.startsWith("./") || r.startsWith("../"));
-    if (ctxDir) return pathResolve(ctxDir);
-    return process.cwd();
+    if (ctxDir) return containedOrBase(ctxDir, base);
+    return base;
   }
 
   async execute(compiled: CompiledPrompt, task: GrokMaxTask, opts?: OpenCodeOptions): Promise<WorkerResult> {
@@ -56,7 +61,27 @@ export class OpenCodeProvider implements Provider<OpenCodeOptions> {
         summary: "opencode run timed out",
         evidence: [],
         grokbotRequired: false,
-        tokensEstimate: compiled.tokensEstimate
+        tokensEstimate: compiled.tokensEstimate,
+        exitCode: null,
+        retryEligible: true
+      };
+    }
+
+    // A non-zero exit code is a failure, regardless of anything printed on
+    // stdout (including a token that merely says "success").
+    if (result.exitCode != null && result.exitCode !== 0) {
+      const detail = result.stderr.trim().slice(0, 2000) || result.stdout.trim().slice(0, 2000) || "(no output)";
+      return {
+        status: "failure",
+        executor: "opencode",
+        summary: `opencode exited with code ${result.exitCode}: ${detail}`,
+        evidence: [`exit code ${result.exitCode}`, ...(result.stderr.trim() ? ["stderr captured"] : [])],
+        grokbotRequired: false,
+        tokensEstimate: compiled.tokensEstimate,
+        rawOutput: result.stdout.slice(0, 8000),
+        stderr: result.stderr.slice(0, 4000),
+        exitCode: result.exitCode,
+        retryEligible: result.signal == null
       };
     }
 
@@ -86,7 +111,9 @@ export class OpenCodeProvider implements Provider<OpenCodeOptions> {
         evidence: [parsed.system ?? "opencode run completed"].filter(Boolean),
         grokbotRequired: false,
         tokensEstimate: compiled.tokensEstimate,
-        rawOutput: result.stdout.slice(0, 8000)
+        rawOutput: result.stdout.slice(0, 8000),
+        stderr: result.stderr.slice(0, 4000) || undefined,
+        exitCode: result.exitCode
       };
     }
 
@@ -98,7 +125,9 @@ export class OpenCodeProvider implements Provider<OpenCodeOptions> {
       evidence: ["opencode run completed"],
       grokbotRequired: false,
       tokensEstimate: compiled.tokensEstimate,
-      rawOutput: result.stdout.slice(0, 8000)
+      rawOutput: result.stdout.slice(0, 8000),
+      stderr: result.stderr.slice(0, 4000) || undefined,
+      exitCode: result.exitCode
     };
   }
 }
@@ -113,18 +142,22 @@ function checkBin(bin: string): boolean {
   }
 }
 
-function runSpawn(bin: string, args: string[], opts: { cwd: string; timeoutMs: number }): Promise<OpenCodeRun> {
+export function runSpawn(bin: string, args: string[], opts: { cwd: string; timeoutMs: number }): Promise<OpenCodeRun> {
   return new Promise<OpenCodeRun>((resolve) => {
+    const child = spawn(bin, args, { cwd: opts.cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let exitCode: number | null = null;
+    let signal: NodeJS.Signals | null = null;
     let settled = false;
-    const child = spawn(bin, args, { cwd: opts.cwd });
-    const finish = (exitCode: number | null, spawnError: string | null): void => {
+    const finish = (code: number | null, sig: NodeJS.Signals | null, spawnError: string | null): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ stdout, stderr, timedOut, exitCode, spawnError });
+      exitCode = code;
+      signal = sig;
+      resolve({ stdout, stderr, timedOut, exitCode, signal, spawnError });
     };
     const timer = setTimeout(() => {
       timedOut = true;
@@ -136,9 +169,35 @@ function runSpawn(bin: string, args: string[], opts: { cwd: string; timeoutMs: n
     child.stderr?.on("data", (d: Buffer) => {
       stderr += d.toString();
     });
-    child.on("error", (err: Error) => finish(null, err.message));
-    child.on("close", (code) => finish(code, null));
+    child.on("error", (err: Error) => {
+      stderr += `spawn error: ${err.message}\n`;
+      finish(null, null, err.message);
+    });
+    child.on("close", (code, sig) => finish(code, sig, null));
   });
+}
+
+/**
+ * Resolve a working-directory ref but never escape `base`. Path traversal
+ * refs (../, absolute paths outside base, symlinks that resolve outside)
+ * degrade to `base` instead of executing a subprocess outside the workspace.
+ */
+export function containedOrBase(ref: string, base: string): string {
+  const abs = pathResolve(base, ref);
+  if (!withinBase(abs, base)) return base;
+  try {
+    const realAbs = realpathSync(abs);
+    if (!withinBase(realAbs, realpathSync(base))) return base;
+  } catch {
+    // Path may not exist yet; the lexical containment check above is enough.
+  }
+  return abs;
+}
+
+function withinBase(p: string, base: string): boolean {
+  if (p === base) return true;
+  const rel = relative(base, p);
+  return !rel.startsWith(".." + sep) && rel !== ".." && !isAbsolute(rel);
 }
 
 type OpenCodeJson = { status?: string; message?: string; artifact?: string; system?: string };

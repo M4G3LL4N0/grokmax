@@ -66,3 +66,35 @@ describe("routeTask", () => {
     expect(r.cheaperThanDirect).toBe(true);
   });
 });
+
+describe("routeTask documented priority order", () => {
+  it("routes generic mechanical tasks to the local API before any reasoning worker", () => {
+    const r = routeTask(task({ goal: "Schedule a reminder for tomorrow at noon" }), new Set(["api", "chatgpt", "opencode"]), null);
+    expect(r.route).toBe("api");
+  });
+
+  it("routes pure research to the reasoning worker even when a local API exists", () => {
+    const r = routeTask(task({ goal: "Research the current state of the art in vector search" }), new Set(["api", "chatgpt"]), null);
+    expect(r.route).toBe("chatgpt");
+  });
+
+  it("routes pure repo work to opencode even when a chatgpt worker exists", () => {
+    const r = routeTask(task({ goal: "Fix the bug in src/main.ts and add a regression test" }), new Set(["opencode", "chatgpt"]), null);
+    expect(r.route).toBe("opencode");
+  });
+
+  it("lets repository capability win for hybrid repo+research tasks", () => {
+    const r = routeTask(task({ goal: "Fix the bug and summarize your changes" }), new Set(["opencode", "chatgpt"]), null);
+    expect(r.route).toBe("opencode");
+  });
+
+  it("reserves grokbot as the last resort for unique capabilities", () => {
+    const r = routeTask(task({ goal: "Use a browser to click login and download my bank statement" }), new Set(["opencode", "chatgpt", "api", "grokbot"]), null);
+    expect(r.route).toBe("grokbot");
+  });
+
+  it("keeps the deterministic route above everything else", () => {
+    const r = routeTask(task({ goal: "Calculate 7*8 and return the integer result" }), new Set(["deterministic", "grokbot", "opencode"]), null);
+    expect(r.route).toBe("deterministic");
+  });
+});

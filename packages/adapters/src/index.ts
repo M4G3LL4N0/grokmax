@@ -14,7 +14,7 @@ export type * from "./chatgpt.js";
 export type * from "./grokbot.js";
 export type * from "./api.js";
 export { DeterministicProvider, evaluate } from "./deterministic.js";
-export { OpenCodeProvider } from "./opencode.js";
+export { OpenCodeProvider, runSpawn, containedOrBase } from "./opencode.js";
 export { ChatGPTProvider } from "./chatgpt.js";
 export { GrokBotProvider } from "./grokbot.js";
 export { ApiProvider } from "./api.js";

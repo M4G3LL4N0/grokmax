@@ -77,6 +77,18 @@ describe("validatePreservation", () => {
     expect(r.lostConstraints).toEqual(["do not deploy"]);
     expect(r.preservedConstraints).toEqual([]);
   });
+
+  it("never lets a negation slip: 'deploy' alone must not satisfy 'do not deploy'", () => {
+    const r = validatePreservation(["do not deploy the website"], "the website is deployable");
+    expect(r.ok).toBe(false);
+    expect(r.lostConstraints.join()).toContain("do not deploy the website");
+  });
+
+  it("keeps negation/modal words first-class for all prohibition classes", () => {
+    expect(validatePreservation(["must not touch vendor"], "touch vendor").ok).toBe(false);
+    expect(validatePreservation(["only use pnpm"], "use npm").ok).toBe(false);
+    expect(validatePreservation(["at most 3 retries"], "retry freely").ok).toBe(false);
+  });
 });
 
 describe("extractHardConstraints", () => {

@@ -13,8 +13,8 @@ import { computeDependencyFingerprint } from "./deps.js";
 
 export { SqliteStore, openStore } from "./db.js";
 export { HotCache } from "./hot.js";
-export { SemanticCache, significantTokens } from "./semantic.js";
-export { computeDependencyFingerprint } from "./deps.js";
+export { SemanticCache, significantTokens, extractCriticalLiterals, criticalLiteralsCompatible } from "./semantic.js";
+export { computeDependencyFingerprint, resolveWithin } from "./deps.js";
 
 export class GrokMaxCache implements CacheOps {
   readonly store: SqliteStore;

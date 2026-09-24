@@ -1,6 +1,6 @@
 {
   "name": "grokmax",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Minimize GrokBot usage while maximizing verified useful output.",
   "license": "MIT",
@@ -14,7 +14,7 @@
     ]
   },
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm -r --workspace-concurrency=2 build",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

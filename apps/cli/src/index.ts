@@ -123,6 +123,9 @@ function makeTask(intent: string, goal: string, flags: CliFlags, extra: Partial<
     goal,
     contextRefs: ["./"],
     freshness: flags.fresh ? "live" : "hourly",
+    // --fresh must bypass every answer cache (L0-L4/L5). requireFresh is what
+    // the pipeline consults; freshness:"live" alone still permits an exact hit.
+    ...(flags.fresh ? { requireFresh: true } : {}),
     ...extra
   };
   // requireFresh skips L1/L2/L3 lookup and write so --fresh recomputes.

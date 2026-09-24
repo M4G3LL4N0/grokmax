@@ -179,8 +179,10 @@ export class GrokMaxEngine {
     }
 
     // ---- L4 artifact reuse: task explicitly references a saved artifact ----
+    // requireFresh bypasses prior-answer reuse on every layer (L0-L5): a forced
+    // fresh run must not be served a stored WorkerResult from any source.
     const artifactRef = (task.contextRefs ?? []).find((r) => r.startsWith("grokmax://artifact/"));
-    if (!cached && artifactRef && this.deps.artifacts && task.output !== "action") {
+    if (!cached && !task.requireFresh && artifactRef && this.deps.artifacts && task.output !== "action") {
       const scope = this.scopeFor(task);
       const art = await this.deps.artifacts.get(artifactRef, scope);
       if (art) {
@@ -199,7 +201,7 @@ export class GrokMaxEngine {
     }
 
     // ---- L5 durable compressed knowledge ----
-    if (!cached && this.deps.knowledge && task.freshness === "immutable") {
+    if (!cached && !task.requireFresh && this.deps.knowledge && task.freshness === "immutable") {
       const k = this.deps.knowledge.get(cHash);
       if (k) {
         try {

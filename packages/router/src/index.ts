@@ -1,13 +1,18 @@
 /**
  * Deterministic-first router.
  *
- * Decision order (mission hierarchy):
- *   1. Could deterministic local code solve this?
- *   2. Could a direct API/tool solve this?
- *   3. Does this need reasoning/research (ChatGPT / cheap model)?
- *   4. Does this need repository inspection/modification (OpenCode)?
- *   5. Does it uniquely require GrokBot (persistent computer, authenticated
- *      apps, plugins, routines, persistent context)?
+ * The cache layers (exact L1, normalized L2, semantic L3, artifact L4,
+ * knowledge L5) are consulted by the pipeline BEFORE routing. For everything
+ * that misses cache, the decision order (mission hierarchy) is:
+ *   1. Explicit `preferredExecutor` override (documented exception).
+ *   2. Deterministic local execution (math/hash/file-count/git) — zero cost.
+ *   3. Generic local DB/API/tool for mechanical tasks that need no reasoning
+ *      and no repository access.
+ *   4. Reasoning/research provider (ChatGPT / cheap model).
+ *   5. Repository inspection/modification (OpenCode).
+ *   6. Grok-Bot — ONLY when uniquely required (persistent computer,
+ *      authenticated apps, plugins, routines, persistent context) and no
+ *      lower-cost worker is capable.
  *
  * Every decision carries a reason, a list of checks, budget enforcement, and a
  * "cheaperThanDirect" estimate. If routing would cost more than direct GrokBot
@@ -102,17 +107,30 @@ export function routeTask(
       reason = `preferredExecutor=${task.preferredExecutor} unavailable; fell back`;
     }
   } else if (deterministicKind) {
+    // Step 2: deterministic local execution.
     route = "deterministic";
     reason = `${deterministicKind.kind} resolvable locally with zero intelligence cost`;
+  } else if (!isRepoWork && !isResearch && !isGrokUnique) {
+    // Step 3: generic local DB/API/tool work (mechanical, no reasoning needed).
+    if (has("api")) {
+      route = "api";
+      reason = "generic mechanical task; local API/tool is the cheapest capable worker";
+    } else {
+      route = fallbackRoute(task, has, combined, isRepoWork, isGrokUnique, deterministicKind, false);
+      reason = "generic task; chosen cheapest available capable worker";
+    }
+  } else if (isResearch && !isRepoWork) {
+    // Step 4: reasoning/research.
+    route = has("chatgpt") ? "chatgpt" : has("opencode") ? "opencode" : has("api") ? "api" : has("grokbot") && !task.maxGrokBotUsage ? "grokbot" : has("grokbot") ? "grokbot" : "none";
+    reason = has("chatgpt") ? "reasoning/research best served by ChatGPT-capable worker" : "chatgpt unavailable; using available worker";
+  } else if (isRepoWork) {
+    // Step 5: repository inspection/modification.
+    route = has("opencode") ? "opencode" : has("chatgpt") ? "chatgpt" : has("grokbot") ? "grokbot" : "none";
+    reason = has("opencode") ? "repository modification/inspection required" : "opencode unavailable";
   } else if (isGrokUnique) {
+    // Step 6: Grok-Bot only when uniquely required and nothing else can do it.
     route = has("grokbot") ? "grokbot" : fallbackRoute(task, has, combined, isRepoWork, isGrokUnique, deterministicKind, false);
     reason = has("grokbot") ? "task uniquely benefits from GrokBot-specific capabilities" : "GrokBot bridge off; using fallback";
-  } else if (isRepoWork) {
-    route = has("opencode") ? "opencode" : has("grokbot") ? "grokbot" : "none";
-    reason = has("opencode") ? "repository modification/inspection required" : "opencode unavailable";
-  } else if (isResearch) {
-    route = has("chatgpt") ? "chatgpt" : has("opencode") ? "opencode" : has("grokbot") ? "grokbot" : "none";
-    reason = has("chatgpt") ? "reasoning/research best served by ChatGPT-capable worker" : "chatgpt unavailable; using available worker";
   } else {
     route = fallbackRoute(task, has, combined, isRepoWork, isGrokUnique, deterministicKind, false);
     reason = "generic task; chosen cheapest available capable worker";
@@ -176,10 +194,12 @@ function fallbackRoute(
   deterministicKind: { re: RegExp; kind: string } | undefined,
   forbidGrokbot = false
 ): RouteValue {
-  if (has("opencode") && (isRepoWork || /code|repo|implement|fix|build|test|file/i.test(combined))) return "opencode";
-  if (has("chatgpt") && RESEARCH_INTENTS.some((re) => re.test(combined))) return "chatgpt";
+  // Fallback follows the same mission hierarchy: deterministic (2) → generic
+  // API (3) → reasoning (4) → repository (5) → GrokBot (6, last resort).
   if (has("deterministic") && deterministicKind) return "deterministic";
   if (has("api")) return "api";
+  if (has("chatgpt") && RESEARCH_INTENTS.some((re) => re.test(combined))) return "chatgpt";
+  if (has("opencode") && (isRepoWork || /code|repo|implement|fix|build|test|file/i.test(combined))) return "opencode";
   if (has("opencode")) return "opencode";
   if (has("chatgpt")) return "chatgpt";
   if (!forbidGrokbot && has("grokbot") && isGrokUnique) return "grokbot";

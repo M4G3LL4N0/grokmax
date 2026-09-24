@@ -1,4 +1,4 @@
-export const PROMPT_VERSION = "grokmax-v0.1.0";
+export const PROMPT_VERSION = "grokmax-v0.1.1";
 
 export const FRESHNESS = {
   IMMUTABLE: "immutable",
@@ -153,6 +153,12 @@ export interface WorkerResult {
   costUsd?: number | null;
   tokensEstimate?: number | null;
   rawOutput?: string;
+  /** Process exit code when a worker runs a subprocess (e.g. OpenCode). */
+  exitCode?: number | null;
+  /** Captured stderr for subprocess workers. */
+  stderr?: string;
+  /** Whether a retry against this executor is likely to succeed. */
+  retryEligible?: boolean;
 }
 
 export interface LedgerEntry {

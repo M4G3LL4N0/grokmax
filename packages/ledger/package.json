@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/ledger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GrokMax usage ledger: measured/estimated/proxy distinction and savings.",
   "license": "MIT",
   "type": "module",

@@ -3,7 +3,8 @@
  * dependency manifests. Reads happen lazily and never fail the pipeline.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { resolveWithin } from "@grokmax/cache";
 import type { ContextUnit, GrokMaxTask } from "@grokmax/core";
 
 const RULE_FILES = ["AGENTS.md", "CONTRIBUTING.md", "grokmax.rules.md", ".grokmax/rules.md"];
@@ -14,8 +15,9 @@ export function collectRawContext(task: GrokMaxTask, cwd: string): ContextUnit[]
   const refs = task.contextRefs ?? [];
   for (const ref of refs) {
     if (ref.startsWith("grokmax://")) continue;
-    const abs = resolve(cwd, ref);
-    if (!existsSync(abs)) continue;
+    // Never read outside the workspace: escaped/traversal refs are dropped.
+    const abs = resolveWithin(ref, cwd);
+    if (!abs || !existsSync(abs)) continue;
     try {
       const st = statSync(abs);
       if (st.isFile() && st.size < 1_000_000) {

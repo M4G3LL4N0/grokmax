@@ -5,16 +5,16 @@ Sunday night checklist for the Monday social launch of GrokMax.
 ## Product readiness
 
 - [x] Monorepo builds: `pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm build` all green
-- [x] Tests green: 109 tests across 12 files incl. integration + security suites
-- [x] Deterministic resolver: 33 fixtures / 5 suites at 100% resolve + 100% outcome (measured locally)
+- [x] Tests green: 151 tests across 18 files incl. integration + security suites
+- [x] Deterministic resolver: 33 fixtures / 5 suites at 100% match (measured locally; 5 escape fixtures are expected declines)
 - [x] `grokmax doctor` passes health checks on the workspace
-- [x] Zero-cost routing proven: math/hash/file-count/git never touch GrokBot
-- [x] Honest telemetry: savings labeled measured / estimated / proxy
+- [x] Zero-model-cost routing proven: math/hash/file-count/git never touch GrokBot
+- [x] Honest telemetry: savings labeled measured / estimated / proxy, never mixed in one denominator
 
 ## Repo cleanliness
 
 - [x] Remove absolute user path `/Users/matador/startups/grokmax` from committed fixtures (verified: only appears in this checklist)
-- [ ] Confirm `git status` clean, no secrets, no `/tmp` refs in tests
+- [x] Confirm `git status` clean, no secrets, no `/tmp` refs in tests
 - [ ] Initial commit + tag `v0.1.0` (branches first)
 
 ## Website (grokmax-website, separate repo)
@@ -35,11 +35,14 @@ Sunday night checklist for the Monday social launch of GrokMax.
 
 ## Honesty gate (non-negotiable)
 
-- [ ] No fabricated benchmark or savings numbers, anywhere
-- [ ] Every claim on the site says what was actually measured (local fixture runs) vs estimated/proxy
-- [ ] No claim that we measure GrokBot's platform usage (we don't)
+- [x] No fabricated benchmark or savings numbers, anywhere
+- [x] Every claim on the site says what was actually measured (local fixture runs) vs estimated/proxy
+- [x] No claim that we measure GrokBot's platform usage (we don't)
+- [x] Independence disclaimer published: GrokMax is not affiliated with Cursor or xAI
 
 ## Verification
 
-- [ ] Final gate run on clean clone: install/lint/typecheck/test/build/doctor
-- [ ] Live smoke: `pnpm cli optimize` miss then hit, `pnpm cli benchmark`, `pnpm cli savings --json`
+- [x] Final gate run: install/lint/typecheck/test/build all green at v0.1.1
+- [x] `pnpm run doctor`: 15 healthy, 3 warning, 0 failure (warnings are environmental)
+- [x] `pnpm benchmark`: 33 fixtures, 100% match, 0 GrokBot required
+- [ ] Live smoke: `pnpm cli optimize` miss then hit, `pnpm cli savings --json`

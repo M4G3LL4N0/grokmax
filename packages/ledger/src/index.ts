@@ -77,11 +77,7 @@ export class Ledger {
       const cacheHit = e.cache.some((c) => c.hit && c.layer !== "L0");
       if (cacheHit) cacheHits += 1;
       if (e.route?.grokbotRequired) grokbotUsed += 1;
-      if (e.measured.grokbotCalls != null) {
-        if (e.measured.grokbotCalls === 0) measuredGrokbotAvoided += 1;
-      } else if (!e.route?.grokbotRequired) {
-        measuredGrokbotAvoided += 1; // only when route never required it (derived, proxy-ish)
-      }
+      if (e.measured.grokbotCalls != null && e.measured.grokbotCalls === 0) measuredGrokbotAvoided += 1;
       if (e.context) {
         contextBeforeCharsTotal += e.context.contextBeforeChars;
         contextAfterCharsTotal += e.context.contextAfterChars;

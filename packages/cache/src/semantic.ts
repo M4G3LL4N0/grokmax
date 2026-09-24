@@ -3,6 +3,9 @@
  *
  * Conservative reuse. A semantic hit is valid only when ALL of these hold:
  *   compatible intent (high significant-token overlap)
+ *   compatible critical literals (numbers, math shapes, negation words,
+ *     paths, versions, urls, hashes, identifiers, keyword-value pairs are
+ *     compared exactly, never fuzzed away)
  *   compatible constraints (identical constraint set)
  *   compatible freshness (stored freshness is at least as fresh as requested)
  *   compatible required output type (identical)
@@ -10,6 +13,12 @@
  *   confidence above threshold
  *   no explicit requireFresh
  *   identical ordered numeric/amount/operator literals and negation tokens
+ *
+ * The literal gate is fail-closed: two intents that differ in any critical
+ * literal NEVER match, regardless of how high raw token overlap is. Without
+ * this, token stripping removed numbers and negation words, so
+ * "Calculate 50+1" and "Calculate 500+1" both shrunk to ["calculate"] and
+ * reported Jaccard 1.0.
  *
  * The intent_hash is used only for deduplication (PRIMARY KEY). Similarity is
  * computed over recently-stored entries by significant-token Jaccard, so near
@@ -43,109 +52,228 @@ interface SemanticRow {
 const DEFAULT_SEMANTIC_THRESHOLD = 0.85;
 const SCAN_WINDOW = 2000;
 
-const STOP = new Set([
-  "please", "the", "and", "with", "for", "you", "your", "this", "that", "can", "could", "would",
-  "give", "need", "want", "should", "from", "into", "about", "where", "when", "what", "have",
-  "been", "will", "are", "was", "were", "does"
-]);
+/**
+ * Math/currency/percent literals are shielded from punctuation stripping and
+ * re-inserted as tokens, so `7*8`, `50+1`, `$50` and `$500` stay distinct in
+ * the token set itself rather than collapsing into bare words.
+ */
+const LITERAL_TOKEN = /(?<![\p{L}\p{N}_.$%-])(?:[$€£¥]\s?)?[-+]?\d+(?:[.,]\d+)*(?:\s?%)?(?:\s*(?:[*/^×÷]|\+|-)\s*(?:[$€£¥]\s?)?[-+]?\d+(?:[.,]\d+)*(?:\s?%)?)*/gu;
 
-/** Contractions fold to the negation they express. Distinct negations stay distinct. */
-const NEGATION_CANON: Readonly<Record<string, string>> = {
-  dont: "not",
-  cant: "not",
-  wont: "not",
-  isnt: "not",
-  arent: "not",
-  wasnt: "not",
-  werent: "not",
-  hasnt: "not",
-  havent: "not",
-  hadnt: "not",
-  shouldnt: "not",
-  wouldnt: "not",
-  couldnt: "not",
-  mustnt: "not",
-  didnt: "not",
-  doesnt: "not",
-  cannot: "not",
-  not: "not",
-  never: "never",
-  neither: "neither",
-  nobody: "nobody",
-  nothing: "nothing",
-  nowhere: "nowhere",
-  without: "without",
-  none: "none",
-  nor: "nor",
-  no: "no"
-};
-
-interface IntentMarks {
-  tokens: string[];
-  literals: string[];
-  negations: string[];
-}
+/**
+ * Contractions and multi-word negations fold to the single negation they
+ * express, so "Don't deploy" and "Do not deploy" share a token while neither
+ * collapses into the positive "Deploy".
+ */
+const NEGATION_FOLD: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bdo(?:es)?n[’']t\b/g, "not"],
+  [/\b(?:is|are|was|were|has|have|had|should|would|could|will|must|can|wan|wan'?t|need|need'?t|ought)(?:n[’']t)\b/g, "not"],
+  [/\bcannot\b/g, "not"],
+  [/\bdo not\b/g, "not"],
+  [/\bmust not\b/g, "not"],
+  [/\bshould not\b/g, "not"],
+  [/\bwill not\b/g, "not"],
+  [/\bwould not\b/g, "not"],
+  [/\bcould not\b/g, "not"],
+  [/\bno longer\b/g, "not"],
+  [/\bno more\b/g, "not"],
+  [/\bnever\b/g, "never"],
+  [/\bwithout\b/g, "without"],
+  [/\bunless\b/g, "unless"],
+  [/\bnor\b/g, "nor"],
+  [/\bnot\b/g, "not"]
+];
 
 export function significantTokens(text: string): string[] {
-  return analyzeIntent(text).tokens;
+  const literals: string[] = [];
+  let base = normalizeWhitespace(text.toLowerCase());
+  for (const [pattern, canon] of NEGATION_FOLD) base = base.replace(pattern, ` ${canon} `);
+  const shielded = base.replace(LITERAL_TOKEN, (raw) => {
+    const canon = raw.replace(/\s+/g, "");
+    if (canon.length > 1) literals.push(canon);
+    return ` gmlit${literals.length - 1} `;
+  });
+  const clean = shielded
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  // Negation/modal words stay significant (never stop-listed) so wording like
+  // "deploy" vs "do not deploy" is not collapsed into the same token set.
+  const stop = new Set(["please", "the", "and", "with", "for", "you", "your", "this", "that", "can", "could", "would", "give", "need", "want", "should", "from", "into", "about", "where", "when", "what", "have", "been", "will", "are", "was", "were", "does"]);
+  const tokens: string[] = [];
+  for (const part of clean) {
+    const lit = /^gmlit(\d+)$/.exec(part);
+    if (lit) {
+      tokens.push(literals[Number(lit[1])] as string);
+      continue;
+    }
+    if (stop.has(part) || /^\d{1,2}$/.test(part)) continue;
+    tokens.push(part);
+  }
+  return [...new Set(tokens)];
 }
 
 /**
- * Ordered numeric/amount/operator literals and negation tokens.
- * Both sequences must be identical for an L3 hit.
+ * Critical literals that must match EXACTLY between a stored intent and the
+ * current request for a semantic hit to be safe. Each category is a sorted,
+ * deduped multiset of canonical strings; ANY category mismatch fails the gate.
+ *
+ * We deliberately err on the side of extraction: a spurious literal only
+ * produces a false negative (allowed), never a false positive.
  */
-function safetyKey(marks: IntentMarks): string {
-  return `${marks.literals.join("\u001f")}\u001e${marks.negations.join("\u001f")}`;
+export interface CriticalLiterals {
+  numbers: string[];
+  mathShapes: string[];
+  currencies: string[];
+  percents: string[];
+  units: string[];
+  negation: string[];
+  modality: string[];
+  paths: string[];
+  dotted: string[];
+  versions: string[];
+  urls: string[];
+  hashes: string[];
+  identifiers: string[];
+  keywords: string[];
 }
 
-function analyzeIntent(text: string): IntentMarks {
-  const folded = normalizeWhitespace(text.toLowerCase().replace(/[’']/g, ""));
-  const literals: string[] = [];
-  const shielded = folded.replace(literalPattern(), (raw) => {
-    literals.push(canonLiteral(raw));
-    return ` gmlit${literals.length - 1} `;
-  });
+const VALUE_STOP = new Set(["not", "no", "the", "a", "an", "to", "of", "for", "and", "or", "in", "on", "at", "is", "are", "was", "were", "be", "with", "from", "by", "it", "its", "this", "that", "do", "does", "did", "will"]);
+const KEYWORDS = ["branch", "repo", "repository", "version", "file", "filename", "dir", "directory", "path", "package", "port", "endpoint", "url", "env", "var", "token", "secret", "model", "engine", "runtime", "db", "database", "sha256", "sha1", "md5"];
+const NEGATION_WORDS = ["not", "never", "no", "without", "unless", "cannot", "won't", "don't", "can't", "isn't", "aren't", "doesn't", "didn't", "must not", "do not", "should not", "no longer", "no more"];
+const MODALITY_WORDS = ["only", "exactly", "must", "should", "before", "after", "until", "always", "at least", "at most"];
 
-  const negations: string[] = [];
-  for (const match of folded.matchAll(negationPattern())) {
-    const word = match[1];
-    if (!word) continue;
-    negations.push(NEGATION_CANON[word] ?? word);
+export function extractCriticalLiterals(text: string): CriticalLiterals {
+  const s = normalizeWhitespace(text);
+  const low = s.toLowerCase();
+
+  // Numbers: plain integers/floats (with sign), not preceded by letter/digit/_.-$
+  const numbers: string[] = [];
+  const numRe = /(?<![\p{L}\p{N}_.$%-])([-+]?\d+(?:\.\d+)?)(?![\p{L}\w])/gu;
+  for (const m of s.matchAll(numRe)) numbers.push(m[1] as string);
+
+  // Currency amounts: $-prefixed decimals
+  const currencies: string[] = [];
+  const curRe = /\$\s?(\d+(?:\.\d+)?)/gi;
+  for (const m of s.matchAll(curRe)) currencies.push(`$${m[1]}`);
+
+  // Percentages
+  const percents: string[] = [];
+  const pctRe = /(\d+(?:\.\d+)?)\s?%/gi;
+  for (const m of s.matchAll(pctRe)) percents.push(`${m[1]}%`);
+
+  // Numbered units (sizes, durations, quantities)
+  const units: string[] = [];
+  const unitRe = /(?<![\p{L}\p{N}_.$%-])(\d+(?:\.\d+)?)\s?(GB|MB|KB|B|ms|s|min|hr|h|day|days|week|weeks|month|months|year|years|token|tokens|x|turns?|requests?|times?)/giu;
+  for (const m of s.matchAll(unitRe)) units.push(`${m[1]}|${(m[2] as string).toLowerCase()}`);
+
+  // Math expression shapes: operand-operator chains with literals replaced by N.
+  const mathShapes: string[] = [];
+  const exprRe = /[-+]?\d+(?:\.\d+)?(?:\s*(?:[+\-*/%^])\s*[-+]?\d+(?:\.\d+)?)+/g;
+  for (const m of s.matchAll(exprRe)) {
+    const shape = (m[0] as string)
+      .replace(/\s+/g, "")
+      .replace(/(\*\*|[+\-*/%^]{1,2})/g, "|$1|")
+      .replace(/\d+(?:\.\d+)?/g, "N")
+      .replace(/\|/g, "");
+    if (shape.length >= 3) mathShapes.push(shape);
   }
 
-  const tokens: string[] = [];
-  for (const part of shielded.split(/\s+/)) {
-    if (!part) continue;
-    const lit = /^gmlit(\d+)$/.exec(part);
-    if (lit) {
-      const value = literals[Number(lit[1])];
-      if (value) tokens.push(value);
-      continue;
+  // Negation and modality words
+  const negation = NEGATION_WORDS.filter((w) => new RegExp(`\\b${escapeRe(w)}\\b`).test(low));
+  const modality = MODALITY_WORDS.filter((w) => new RegExp(`\\b${escapeRe(w)}\\b`).test(low));
+
+  // Paths (slash or backslash), dotted names, versions, urls, hashes
+  const paths: string[] = [];
+  const dotted: string[] = [];
+  const versions: string[] = [];
+  const urls: string[] = [];
+  const hashes: string[] = [];
+  for (const tok of s.split(/\s+/)) {
+    const t = tok.trim();
+    if (!t || /^[.,;:!?]+$/.test(t)) continue;
+    if (/[\\/]/.test(t)) {
+      paths.push(t.toLowerCase());
+    } else if (/^https?:\/\//i.test(t)) {
+      urls.push(t.toLowerCase());
+    } else if (/^[0-9a-f]{32}$/i.test(t) || /^[a-f0-9]{40}$/i.test(t)) {
+      hashes.push(t.toLowerCase());
+    } else if (isVersion(t)) {
+      versions.push(t.toLowerCase());
+    } else if (/\d+\.\d+/.test(t) && /[A-Za-z_]/.test(t)) {
+      dotted.push(t.toLowerCase());
     }
-    const negation = NEGATION_CANON[part];
-    if (negation) {
-      tokens.push(negation);
-      continue;
-    }
-    if (part.length <= 2 || STOP.has(part)) continue;
-    tokens.push(part);
   }
 
-  return { tokens: [...new Set(tokens)], literals, negations };
+  // Identifiers: camel/pascal/snake/acronym tokens or letter+digit mixes.
+  // A plain capitalized word ("Calculate") is NOT an identifier — only tokens
+  // with internal casing transitions, ALL-CAPS acronyms, or mixed letter+digit.
+  const identifiers: string[] = [];
+  for (const tok of s.split(/\s+/)) {
+    const w = tok.replace(/[^\p{L}\p{N}_]/gu, "");
+    if (w.length < 2) continue;
+    const letters = (w.match(/\p{L}/gu) ?? []).length;
+    const digits = (w.match(/\p{N}/gu) ?? []).length;
+    const mixedCase = /[\p{Ll}]\p{Lu}/u.test(w) || /^\p{Lu}\p{Ll}+\p{Lu}/u.test(w);
+    const acronym = /^\p{Lu}{2,}$/u.test(w);
+    if ((letters > 0 && digits > 0) || mixedCase || acronym) identifiers.push(w.toLowerCase());
+  }
+
+  // Keyword-value pairs: branch main, version 1.3.0, sha256 of hello, ...
+  const keywords: string[] = [];
+  const TRAILING_STOP = new Set(["at", "to", "for", "of", "from", "in", "on", "with", "by", "and", "or", "the", "a", "an", "is", "are", "was", "were", "be"]);
+  const kwRe = new RegExp(`\\b(${KEYWORDS.join("|")})\\b(?:\\s+(?:name|of|to|for|is|:))?\\s+([^\\s,;\\n]+(?:\\s+[^\\s,;\\n]+){0,1})`, "gi");
+  for (const m of low.matchAll(kwRe)) {
+    const key = m[1] as string;
+    let val = (m[2] as string).trim().replace(/[.,;!?]+$/, "").trim();
+    const words = val.split(/\s+/);
+    while (words.length > 1 && TRAILING_STOP.has(words[words.length - 1] as string)) words.pop();
+    val = words.join(" ");
+    if (!val) continue;
+    if (VALUE_STOP.has(val) || (/^\d+$/.test(val) && !["port", "version"].includes(key))) continue;
+    if (val.length > 80) continue;
+    keywords.push(`${key}:${val}`);
+  }
+
+  return { numbers: dedupeSort(numbers), mathShapes: dedupeSort(mathShapes), currencies: dedupeSort(currencies), percents: dedupeSort(percents), units: dedupeSort(units), negation: dedupeSort(negation), modality: dedupeSort(modality), paths: dedupeSort(paths), dotted: dedupeSort(dotted), versions: dedupeSort(versions), urls: dedupeSort(urls), hashes: dedupeSort(hashes), identifiers: dedupeSort(identifiers), keywords: dedupeSort(keywords) };
 }
 
-function literalPattern(): RegExp {
-  // Currency amounts, percents, and math expressions. Operators stay attached
-  // so `7*8`, `50+1`, and `500+1` are different keys, as are `$50` and `$500`.
-  return /(?<![\p{L}\d])(?:[$€£¥]\s*)?[+-]?\d+(?:[.,]\d+)*(?:\s*%|(?:\s*[*/=^×÷+-]\s*(?:[$€£¥]\s*)?[+-]?\d+(?:[.,]\d+)*(?:\s*%)?)*)*/gu;
+export function criticalLiteralsCompatible(a: string, b: string): boolean {
+  const A = extractCriticalLiterals(a);
+  const B = extractCriticalLiterals(b);
+  return (
+    sameList(A.numbers, B.numbers) &&
+    sameList(A.mathShapes, B.mathShapes) &&
+    sameList(A.currencies, B.currencies) &&
+    sameList(A.percents, B.percents) &&
+    sameList(A.units, B.units) &&
+    sameList(A.negation, B.negation) &&
+    sameList(A.modality, B.modality) &&
+    sameList(A.paths, B.paths) &&
+    sameList(A.dotted, B.dotted) &&
+    sameList(A.versions, B.versions) &&
+    sameList(A.urls, B.urls) &&
+    sameList(A.hashes, B.hashes) &&
+    sameList(A.identifiers, B.identifiers) &&
+    sameList(A.keywords, B.keywords)
+  );
 }
 
-function canonLiteral(raw: string): string {
-  return raw.replace(/\s+/g, "").replace(/,/g, "").replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-");
+function isVersion(t: string): boolean {
+  return /^\d+\.\d+\.\d+([-+.]?[\w]+)?$/.test(t);
 }
 
-function negationPattern(): RegExp {
-  return /\b(dont|cant|wont|cannot|isnt|arent|wasnt|werent|hasnt|havent|hadnt|shouldnt|wouldnt|couldnt|mustnt|didnt|doesnt|never|neither|nobody|nothing|nowhere|without|none|nor|not|no)\b/g;
+function escapeRe(w: string): string {
+  return w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function dedupeSort(arr: string[]): string[] {
+  return [...new Set(arr)].sort();
+}
+
+function sameList(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 function jaccard(a: string[], b: string[]): number {
@@ -199,19 +327,20 @@ export class SemanticCache {
       .prepare("SELECT * FROM semantic_index ORDER BY stored_at DESC LIMIT ?")
       .all(SCAN_WINDOW) as unknown as SemanticRow[];
 
-    const current = analyzeIntent(intent);
-    const currentKey = safetyKey(current);
+    const currentTokens = significantTokens(intent);
     const currentConstraints = new Set<string>((task.constraints ?? []).map(normalizeWhitespace));
     const currentOutput = task.output ?? "answer";
 
     let best: SemanticEntry | null = null;
     for (const row of candidates) {
-      const stored = analyzeIntent(row.intent);
-      const conf = jaccard(stored.tokens, current.tokens);
+      const storedTokens = significantTokens(row.intent);
+      const conf = jaccard(storedTokens, currentTokens);
       if (conf < this.threshold) continue;
-      // Refuse the hit when numbers, operators, amounts, or negations differ,
-      // even if the remaining words are identical.
-      if (safetyKey(stored) !== currentKey) continue;
+
+      // Fail-closed literal gate: any critical-literal mismatch (numbers,
+      // operators/math shape, negation words, paths, versions, identifiers,
+      // keyword-value pairs, ...) is rejected regardless of similarity.
+      if (!criticalLiteralsCompatible(row.intent, intent)) continue;
 
       if (row.expires_at != null && Date.now() > row.expires_at) {
         this.store.bump("semantic_expired");

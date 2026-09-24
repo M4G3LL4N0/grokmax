@@ -96,7 +96,7 @@ describe("Ledger", () => {
     expect(s.cacheHits).toBe(0);
     expect(s.grokbotUsed).toBe(1);
     expect(s.grokbotAvoidedEstimate).toBe(3); // every non-grokbot route
-    expect(s.measuredGrokbotAvoided).toBe(3); // r1 measured 0, r2+r4 route-avoided proxy
+    expect(s.measuredGrokbotAvoided).toBe(1); // ONLY genuinely measured zero-call runs (r1)
     expect(s.errors).toBe(1);
     expect(s.retries).toBe(1);
     store.close();

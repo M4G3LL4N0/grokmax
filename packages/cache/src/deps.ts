@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { resolve as pathResolve } from "node:path";
+import { isAbsolute, relative, resolve as pathResolve, sep } from "node:path";
 import type { GrokMaxTask } from "@grokmax/core";
 
 /**
@@ -17,11 +17,13 @@ export function computeDependencyFingerprint(task: GrokMaxTask, opts: { cwd?: st
   for (const ref of task.contextRefs ?? []) {
     if (ref.startsWith("grokmax://")) continue;
     if (isLocalPath(ref)) {
-      const abs = resolvePath(ref, cwd);
-      if (existsSync(abs)) {
+      const abs = resolveWithin(ref, cwd);
+      if (abs && existsSync(abs)) {
         parts.push(`file:${abs}:${hashFile(abs)}`);
-      } else {
+      } else if (abs) {
         parts.push(`missing:${ref}`);
+      } else {
+        parts.push(`containment-rejected:${ref}`);
       }
     } else {
       parts.push(`ref:${ref}`);
@@ -34,7 +36,7 @@ export function computeDependencyFingerprint(task: GrokMaxTask, opts: { cwd?: st
   const env = envDeps();
   if (env.length > 0) parts.push(`env:${env.join("|")}`);
 
-  const version = "grokmax-v0.1.0";
+  const version = "grokmax-v0.1.1";
   parts.push(`v:${version}`);
 
   return createHash("sha256").update(parts.join("::")).digest("hex");
@@ -44,8 +46,30 @@ function isLocalPath(ref: string): boolean {
   return ref.startsWith("./") || ref.startsWith("../") || ref.startsWith("/") || /^[A-Za-z]:[\\/]/.test(ref);
 }
 
-function resolvePath(ref: string, cwd: string): string {
-  return pathResolve(cwd, ref);
+const ENCODED_TRAVERSAL = /(?:%2e%2e|%2e\.|\.%2e|%2E%2E|%252e%252e|\.%2f|\.%5c|%2e%2e%2f|%2e%2e%5c)/i;
+
+/**
+ * Resolve a workspace path but never leave `cwd`. Rejects traversal refs
+ * (../), absolute refs outside cwd, symlinks that resolve outside, and
+ * URL-encoded traversal. Returns null for a containment violation.
+ */
+export function resolveWithin(ref: string, cwd: string): string | null {
+  if (ENCODED_TRAVERSAL.test(ref)) return null;
+  const abs = pathResolve(cwd, ref);
+  if (!isWithin(abs, cwd)) return null;
+  try {
+    const realAbs = realpathSync(abs);
+    if (!isWithin(realAbs, realpathSync(cwd))) return null;
+  } catch {
+    // Lexically contained path that does not exist (yet) is acceptable.
+  }
+  return abs;
+}
+
+function isWithin(p: string, base: string): boolean {
+  if (p === base) return true;
+  const rel = relative(base, p);
+  return !rel.startsWith(".." + sep) && rel !== ".." && !isAbsolute(rel);
 }
 
 function hashFile(p: string): string {

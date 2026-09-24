@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/telemetry",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GrokMax telemetry: stats, savings, summary export with strict honesty rules.",
   "license": "MIT",
   "type": "module",

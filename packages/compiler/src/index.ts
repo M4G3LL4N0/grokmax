@@ -133,8 +133,8 @@ export function compile(opts: CompileInput): CompiledPrompt {
 /**
  * Preservation check. A constraint is kept only when its full text survives in
  * the prompt and every significant token does too. Negation and obligation
- * words (`not`, `never`, `don't`, `must`, `only`, `do`) are mandatory — they
- * are not stopwords.
+ * words (`not`, `never`, `must`, `only`, `do`) are mandatory — they are not
+ * stopwords. This means "deploy" alone can never satisfy "do not deploy".
  */
 export function validatePreservation(
   constraints: string[],
