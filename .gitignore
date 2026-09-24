@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+data/*.db
+data/*.db-*
+data/artifacts/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+benchmarks/results/raw/*.json
+benchmarks/results/.cache/
+*.d.ts.map
+*.js.map
+.vscode/
+.idea/

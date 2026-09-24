@@ -1,0 +1,4 @@
+[
+  { "id": "count-files-cwd", "intent": "count files", "goal": "Count the number of files in .", "expectedResolver": "deterministic", "expectedOutcomeRegex": "contains \\d+ entries" },
+  { "id": "count-missing-dir", "intent": "count files", "goal": "Count the number of files in does-not-exist-xyz", "expectedResolver": "deterministic", "expectedOutcomeRegex": "no such directory" }
+]

@@ -1,0 +1,6 @@
+[
+  { "id": "sha256-of-string", "intent": "hash", "goal": "Compute the sha256 of hello", "expectedResolver": "deterministic", "expectedOutcomeRegex": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" },
+  { "id": "md5-of-string", "intent": "hash", "goal": "Compute the md5 of hello", "expectedResolver": "deterministic", "expectedOutcomeRegex": "5d41402abc4b2a76b9719d911017c592" },
+  { "id": "sha256-of-file", "intent": "hash", "goal": "Compute the sha256 of package.json", "expectedResolver": "deterministic", "expectedOutcomeRegex": "[0-9a-f]{64}" },
+  { "id": "sha256-join", "intent": "hash", "goal": "Compute the sha256 of join", "expectedResolver": "deterministic", "expectedOutcomeRegex": "58393216032be6257784ac0c6a73efb2a084e27b4cfff1e6acee7b7e6ab93b10" }
+]

@@ -1,0 +1,22 @@
+[
+  { "id": "math-basic-add", "intent": "calculate", "goal": "Calculate 12+34", "expectedResolver": "deterministic", "expectedOutcomeRegex": "46" },
+  { "id": "math-basic-mul", "intent": "calculate", "goal": "Calculate 7*8", "expectedResolver": "deterministic", "expectedOutcomeRegex": "56" },
+  { "id": "math-basic-div", "intent": "calculate", "goal": "Calculate 42/6", "expectedResolver": "deterministic", "expectedOutcomeRegex": "7" },
+  { "id": "math-precendence", "intent": "calculate", "goal": "Evaluate 2+3*4", "expectedResolver": "deterministic", "expectedOutcomeRegex": "14" },
+  { "id": "math-parens", "intent": "calculate", "goal": "Evaluate (2+3)*4", "expectedResolver": "deterministic", "expectedOutcomeRegex": "20" },
+  { "id": "math-fraction", "intent": "calculate", "goal": "Compute 10/4", "expectedResolver": "deterministic", "expectedOutcomeRegex": "2\\.5" },
+  { "id": "math-modulo", "intent": "calculate", "goal": "Compute 17%5", "expectedResolver": "deterministic", "expectedOutcomeRegex": "2" },
+  { "id": "math-power", "intent": "calculate", "goal": "Compute 2^10", "expectedResolver": "deterministic", "expectedOutcomeRegex": "1024" },
+  { "id": "math-sqrt", "intent": "calculate", "goal": "Calculate sqrt(144)", "expectedResolver": "deterministic", "expectedOutcomeRegex": "12" },
+  { "id": "math-abs", "intent": "calculate", "goal": "Calculate abs(-42)", "expectedResolver": "deterministic", "expectedOutcomeRegex": "42" },
+  { "id": "math-neg", "intent": "calculate", "goal": "Evaluate -5+3", "expectedResolver": "deterministic", "expectedOutcomeRegex": "-2" },
+  { "id": "math-neg-literal", "intent": "calculate", "goal": "Calculate (0-7)", "expectedResolver": "deterministic", "expectedOutcomeRegex": "-7" },
+  { "id": "math-compound", "intent": "calculate", "goal": "Compute 2*(3+4)-1", "expectedResolver": "deterministic", "expectedOutcomeRegex": "13" },
+  { "id": "math-deep-nesting", "intent": "calculate", "goal": "Evaluate ((1+2)*(3+4))", "expectedResolver": "deterministic", "expectedOutcomeRegex": "21" },
+  { "id": "math-decimal", "intent": "calculate", "goal": "Calculate 3.5*2", "expectedResolver": "deterministic", "expectedOutcomeRegex": "7" },
+  { "id": "math-multi-op", "intent": "calculate", "goal": "Evaluate 5+5*5", "expectedResolver": "deterministic", "expectedOutcomeRegex": "30" },
+  { "id": "math-chain", "intent": "calculate", "goal": "Evaluate 2*3*4", "expectedResolver": "deterministic", "expectedOutcomeRegex": "24" },
+  { "id": "math-sub", "intent": "calculate", "goal": "Evaluate 100-25", "expectedResolver": "deterministic", "expectedOutcomeRegex": "75" },
+  { "id": "math-fraction-whole", "intent": "calculate", "goal": "Compute 81/9", "expectedResolver": "deterministic", "expectedOutcomeRegex": "9" },
+  { "id": "math-paren-2", "intent": "calculate", "goal": "Evaluate ((2+3)+(4+5))", "expectedResolver": "deterministic", "expectedOutcomeRegex": "14" }
+]

@@ -1,0 +1,7 @@
+[
+  { "id": "escape-destructive-sql", "intent": "delete the production database", "goal": "Write SQL to drop all tables and run it on prod", "expectedResolver": "deterministic", "expectedOutcomeRegex": "no deterministic" },
+  { "id": "escape-repo-refactor", "intent": "refactor", "goal": "Refactor the scheduler module and add tests", "expectedResolver": "deterministic", "expectedOutcomeRegex": "no deterministic" },
+  { "id": "escape-research", "intent": "research", "goal": "Research the current state of the art in vector search", "expectedResolver": "deterministic", "expectedOutcomeRegex": "no deterministic" },
+  { "id": "escape-grokbot-limits", "intent": "login to website", "goal": "Log into my bank website and download the statement", "expectedResolver": "deterministic", "expectedOutcomeRegex": "no deterministic" },
+  { "id": "escape-open-ended", "intent": "write a story", "goal": "Write a short marketing story for launching a developer tool", "expectedResolver": "deterministic", "expectedOutcomeRegex": "no deterministic" }
+]

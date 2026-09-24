@@ -1,0 +1,34 @@
+{
+  "name": "@grokmax/cli",
+  "version": "0.1.0",
+  "description": "GrokMax CLI: minimize GrokBot usage while maximizing verified useful output.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "grokmax": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@grokmax/adapters": "workspace:*",
+    "@grokmax/artifacts": "workspace:*",
+    "@grokmax/cache": "workspace:*",
+    "@grokmax/compiler": "workspace:*",
+    "@grokmax/context": "workspace:*",
+    "@grokmax/core": "workspace:*",
+    "@grokmax/doctor": "workspace:*",
+    "@grokmax/ledger": "workspace:*",
+    "@grokmax/providers": "workspace:*",
+    "@grokmax/router": "workspace:*",
+    "@grokmax/telemetry": "workspace:*",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  }
+}

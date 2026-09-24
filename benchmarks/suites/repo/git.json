@@ -1,0 +1,4 @@
+[
+  { "id": "git-head", "intent": "git status", "goal": "Run git rev-parse HEAD and print the commit hash", "expectedResolver": "deterministic", "expectedOutcomeRegex": "[0-9a-f]{40}" },
+  { "id": "git-status-clean", "intent": "git status", "goal": "git status --porcelain and report whether the tree is clean", "expectedResolver": "deterministic", "expectedOutcomeRegex": "clean|changed" }
+]

@@ -1,0 +1,39 @@
+{
+  "name": "grokmax",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimize GrokBot usage while maximizing verified useful output.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "grokmax": "tsx apps/cli/src/index.ts",
+    "cli": "tsx apps/cli/src/index.ts",
+    "doctor": "tsx apps/cli/src/index.ts doctor",
+    "benchmark": "tsx apps/cli/src/index.ts benchmark"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.17.0",
+    "globals": "^17.12.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.18.2",
+    "vitest": "^3.0.0"
+  }
+}
