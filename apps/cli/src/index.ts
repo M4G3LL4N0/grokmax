@@ -125,6 +125,8 @@ function makeTask(intent: string, goal: string, flags: CliFlags, extra: Partial<
     freshness: flags.fresh ? "live" : "hourly",
     ...extra
   };
+  // requireFresh skips L1/L2/L3 lookup and write so --fresh recomputes.
+  if (flags.fresh) task.requireFresh = true;
   if (flags.dryRun) task.preferredExecutor = "auto";
   return task;
 }
@@ -199,7 +201,7 @@ async function main(): Promise<void> {
   program
     .command("optimize <goal>")
     .description("Run the full pipeline on a goal and print the plan + outcome.")
-    .option("--fresh", "force live freshness")
+    .option("--fresh", "bypass cache and recompute")
     .option("--json", "emit JSON")
     .action(async (goal: string, opts: Record<string, unknown>) => {
       const flags = resolveFlags({ ...program.opts(), ...opts });
@@ -217,7 +219,7 @@ async function main(): Promise<void> {
   program
     .command("run <intent> <goal>")
     .description("Run an explicit intent + goal.")
-    .option("--fresh", "force live freshness")
+    .option("--fresh", "bypass cache and recompute")
     .option("--json", "emit JSON")
     .action(async (intent: string, goal: string, opts: Record<string, unknown>) => {
       const flags = resolveFlags({ ...program.opts(), ...opts });
@@ -235,7 +237,7 @@ async function main(): Promise<void> {
   program
     .command("ask <question>")
     .description("Shorthand: intent=goal=question, print the answer.")
-    .option("--fresh", "force live freshness")
+    .option("--fresh", "bypass cache and recompute")
     .option("--json", "emit JSON")
     .action(async (question: string, opts: Record<string, unknown>) => {
       const flags = resolveFlags({ ...program.opts(), ...opts });
