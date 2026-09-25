@@ -9,7 +9,7 @@ import {
 
 describe("types", () => {
   it("defines the canonical prompt version", () => {
-    expect(PROMPT_VERSION).toBe("grokmax-v0.1.1");
+    expect(PROMPT_VERSION).toBe("grokmax-v0.2.0-rc.1");
   });
 
   it("defaults freshness to hourly", () => {

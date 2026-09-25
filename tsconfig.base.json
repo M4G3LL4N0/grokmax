@@ -30,7 +30,11 @@
       "@grokmax/providers": ["./packages/providers/src/index.ts"],
       "@grokmax/adapters": ["./packages/adapters/src/index.ts"],
       "@grokmax/telemetry": ["./packages/telemetry/src/index.ts"],
-      "@grokmax/doctor": ["./packages/doctor/src/index.ts"]
+      "@grokmax/doctor": ["./packages/doctor/src/index.ts"],
+      "@grokmax/usage": ["./packages/usage/src/index.ts"],
+      "@grokmax/experiment": ["./packages/experiment/src/index.ts"],
+      "@grokmax/edge": ["./packages/edge/src/index.ts"],
+      "@grokmax/inbot": ["./packages/inbot/src/index.ts"]
     }
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "grokmax",
-  "version": "0.1.1",
+  "version": "0.2.0-rc.1",
   "private": true,
   "description": "Minimize GrokBot usage while maximizing verified useful output.",
   "license": "MIT",

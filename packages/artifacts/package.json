@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/artifacts",
-  "version": "0.1.1",
+  "version": "0.2.0-rc.1",
   "description": "GrokMax L4 artifact cache + L5 durable compressed knowledge, scope-isolated.",
   "license": "MIT",
   "type": "module",

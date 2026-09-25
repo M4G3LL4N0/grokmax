@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/core",
-  "version": "0.1.1",
+  "version": "0.2.0-rc.1",
   "description": "GrokMax core: task contract, normalization, fingerprinting, orchestration.",
   "license": "MIT",
   "type": "module",

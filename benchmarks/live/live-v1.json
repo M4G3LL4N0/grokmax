@@ -1,0 +1,113 @@
+{
+  "name": "live-v1",
+  "version": "v1.0.0",
+  "description": "Controlled live scenarios for comparing native / inbot / edge execution. Kept deliberately small: these are expensive enough that 7 is the honest budget.",
+  "taskFixtureVersion": "v1.0.0",
+  "repoFixtureVersion": "repo-v1.0.0",
+  "scenarios": [
+    {
+      "id": "exact-repeat",
+      "title": "Exact repeat of a deterministic task",
+      "capabilityClass": "cache",
+      "intent": "deterministic arithmetic that should be answered without GrokBot",
+      "goal": "Calculate 1234+5678 and return the integer result",
+      "expectedRoute": "deterministic",
+      "requiresGrokbot": false,
+      "successCriteria": {
+        "completed": true,
+        "noGrokbotInvocation": true,
+        "summaryRegex": "= 6912$"
+      }
+    },
+    {
+      "id": "safe-paraphrase",
+      "title": "Safe semantic paraphrase of an already-answered task",
+      "capabilityClass": "cache",
+      "intent": "same arithmetic, different wording",
+      "goal": "Compute 1234 plus 5678 and return the integer result",
+      "expectedRoute": "cache",
+      "requiresGrokbot": false,
+      "successCriteria": {
+        "completed": true,
+        "noGrokbotInvocation": true,
+        "summaryRegex": "6912"
+      }
+    },
+    {
+      "id": "long-context-small-answer",
+      "title": "Long context, small answer",
+      "capabilityClass": "deterministic",
+      "intent": "answer one precise question from a large body of text",
+      "goal": "In the repository root README, how many deterministic benchmark fixtures are listed? Return only the number.",
+      "expectedRoute": "opencode",
+      "requiresGrokbot": false,
+      "successCriteria": {
+        "completed": true,
+        "noGrokbotInvocation": true,
+        "summaryRegex": "\\d+"
+      }
+    },
+    {
+      "id": "repo-analysis",
+      "title": "Repository analysis, read-only",
+      "capabilityClass": "repository",
+      "intent": "understand the repository without changing it",
+      "goal": "Read this repository and report which cache layer is consulted first and why. Do not modify any files.",
+      "expectedRoute": "opencode",
+      "requiresGrokbot": false,
+      "repoFixturePath": "benchmarks/fixtures/repo-min",
+      "successCriteria": {
+        "completed": true,
+        "noGrokbotInvocation": true,
+        "summaryRegex": "(?i)L1|cache"
+      }
+    },
+    {
+      "id": "repo-modify-disposable",
+      "title": "Repository modification on a disposable fixture",
+      "capabilityClass": "repository",
+      "intent": "make a change that must not leak into other modes",
+      "goal": "In this repository, add a line to the file fixtures/TASK_NOTE.md recording that this fixture was modified. Do not touch anything else.",
+      "expectedRoute": "opencode",
+      "requiresGrokbot": false,
+      "repoFixturePath": "benchmarks/fixtures/repo-min",
+      "successCriteria": {
+        "completed": true,
+        "noGrokbotInvocation": true,
+        "summaryRegex": "(?i)TASK_NOTE|appended|added"
+      }
+    },
+    {
+      "id": "current-research",
+      "title": "Current-events research (advisory route)",
+      "capabilityClass": "reasoning",
+      "intent": "reasoning/research that should go to the advisory worker, not GrokBot",
+      "goal": "Compare the tradeoffs of storing benchmark state in SQLite versus JSON files for a local-first CLI. Recommend one and justify briefly.",
+      "expectedRoute": "chatgpt",
+      "requiresGrokbot": false,
+      "successCriteria": {
+        "completed": true,
+        "noGrokbotInvocation": true,
+        "summaryRegex": "(?i)sqlite|json"
+      }
+    },
+    {
+      "id": "browser-auth-required",
+      "title": "Authenticated browser interaction — the one that genuinely needs GrokBot",
+      "capabilityClass": "browser",
+      "intent": "the only scenario in this suite that may legitimately require GrokBot",
+      "goal": "Open the public example test page at example.com and report the page title exactly.",
+      "expectedRoute": "grokbot",
+      "requiresGrokbot": true,
+      "successCriteria": {
+        "completed": true,
+        "summaryRegex": "(?i)example"
+      }
+    }
+  ],
+  "notes": [
+    "Six of seven scenarios are designed to be completable without GrokBot.",
+    "A scenario that fails is recorded as a failure and is never counted as a saving.",
+    "The browser scenario is expected to invoke GrokBot; that is the point of including it."
+  ]
+}

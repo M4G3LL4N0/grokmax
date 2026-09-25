@@ -78,11 +78,16 @@ pnpm cli savings
 | `grokmax optimize "<goal>"` | Full pipeline: plan + outcome. |
 | `grokmax run <intent> <goal>` | Explicit intent + goal. |
 | `grokmax ask "<question>"` | Shorthand: intent = goal = question. |
+| `grokmax edge "<task>"` | Edge Mode: complete the work before GrokBot. See [docs/EDGE-MODE.md](docs/EDGE-MODE.md). |
+| `grokmax preflight "<task>"` | In-Bot preflight contract for the GrokBot skill. See [docs/INBOT-MODE.md](docs/INBOT-MODE.md). |
 | `grokmax route "<goal>"` | Routing decision only (never executes). |
 | `grokmax dry-run "<goal>"` | Plan without executing anything. |
 | `grokmax explain <runId>` | Inspect a specific run in the ledger. |
 | `grokmax cache stats\|prune\|clear` | Cache health / maintenance. |
 | `grokmax usage` | Ledger summary, honestly labeled. |
+| `grokmax usage snapshot add\|list\|diff` | Provenance-aware platform usage observations. See [docs/PLATFORM-MEASUREMENT.md](docs/PLATFORM-MEASUREMENT.md). |
+| `grokmax experiment create\|record\|report` | Reproducible live experiment sessions. See [docs/LIVE-BENCHMARK.md](docs/LIVE-BENCHMARK.md). |
+| `grokmax bench manifest\|compare\|assert-cold\|reset-fixture` | Benchmark manifests and contamination guards. |
 | `grokmax savings` | Savings report (`--json` for machine-readable). |
 | `grokmax benchmark` | Run fixture suites, measured locally. |
 | `grokmax doctor` | Health checks across every subsystem. |

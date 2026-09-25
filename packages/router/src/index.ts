@@ -8,7 +8,10 @@
  *   2. Deterministic local execution (math/hash/file-count/git) — zero cost.
  *   3. Generic local DB/API/tool for mechanical tasks that need no reasoning
  *      and no repository access.
- *   4. Reasoning/research provider (ChatGPT / cheap model).
+ *   4. Reasoning / research / planning / compression / adjudication
+ *      (ChatGPT, the advisory worker). ChatGPT is preferred here, and when it
+ *      is not configured the router degrades to another capable worker rather
+ *      than requiring a paid API or escalating to GrokBot.
  *   5. Repository inspection/modification (OpenCode).
  *   6. Grok-Bot — ONLY when uniquely required (persistent computer,
  *      authenticated apps, plugins, routines, persistent context) and no
@@ -34,6 +37,18 @@ const REPO_INTENTS = [
 
 const RESEARCH_INTENTS = [
   /\b(research|investigate|find out|what is the latest|current|news|today|web|internet|search|compare|analysis|summarize|explain|why does|how does)\b/i
+];
+
+/**
+ * Advisory work: reasoning, planning, design, review, compression and
+ * adjudication that needs a language model but not repository mutation and not
+ * an authenticated browser. This is ChatGPT's lane — it is the preferred
+ * worker for turning a vague request into a plan, not for doing the work.
+ */
+const ADVISORY_INTENTS = [
+  /\b(plan|planning|roadmap|design|architect|architecture|strategy|approach|proposal|trade-?offs?|options?|decide|decide between|recommend|adjudicate|review|critique|evaluate|assess|rank|score|prioriti[sz]e)\b/i,
+  /\b(compress|summari[sz]e for|tl;?dr|condense|distil|distill|extract key|action items|next steps)\b/i,
+  /\b(what should i|should we|is it better|which approach|help me decide)\b/i
 ];
 
 const GROKBOT_UNIQUE_INTENTS = [
@@ -80,6 +95,8 @@ export function routeTask(
   checks.push({ label: "research-reasoning", result: isResearch });
   const isGrokUnique = GROKBOT_UNIQUE_INTENTS.some((re) => re.test(combined));
   checks.push({ label: "grokbot-unique-capability", result: isGrokUnique });
+  const isAdvisory = ADVISORY_INTENTS.some((re) => re.test(combined)) && !isRepoWork && !isGrokUnique;
+  checks.push({ label: "advisory-reasoning", result: isAdvisory });
 
   // Explicit executor preference.
   let preferred: RouteValue | null = null;
@@ -110,7 +127,7 @@ export function routeTask(
     // Step 2: deterministic local execution.
     route = "deterministic";
     reason = `${deterministicKind.kind} resolvable locally with zero intelligence cost`;
-  } else if (!isRepoWork && !isResearch && !isGrokUnique) {
+  } else if (!isRepoWork && !isResearch && !isAdvisory && !isGrokUnique) {
     // Step 3: generic local DB/API/tool work (mechanical, no reasoning needed).
     if (has("api")) {
       route = "api";
@@ -119,10 +136,22 @@ export function routeTask(
       route = fallbackRoute(task, has, combined, isRepoWork, isGrokUnique, deterministicKind, false);
       reason = "generic task; chosen cheapest available capable worker";
     }
-  } else if (isResearch && !isRepoWork) {
-    // Step 4: reasoning/research.
-    route = has("chatgpt") ? "chatgpt" : has("opencode") ? "opencode" : has("api") ? "api" : has("grokbot") && !task.maxGrokBotUsage ? "grokbot" : has("grokbot") ? "grokbot" : "none";
-    reason = has("chatgpt") ? "reasoning/research best served by ChatGPT-capable worker" : "chatgpt unavailable; using available worker";
+  } else if ((isResearch || isAdvisory) && !isRepoWork) {
+    // Step 4: reasoning / research / planning / compression / adjudication.
+    // ChatGPT is the preferred advisory worker. When it is not configured we
+    // degrade to whatever capable worker exists rather than requiring a paid
+    // API or escalating to GrokBot.
+    if (has("chatgpt")) {
+      route = "chatgpt";
+      reason = isAdvisory
+        ? `advisory work (${matchLabel(ADVISORY_INTENTS, combined)}) best served by the ChatGPT reasoning worker`
+        : "reasoning/research best served by ChatGPT-capable worker";
+    } else {
+      route = has("opencode") ? "opencode" : has("api") ? "api" : has("grokbot") ? "grokbot" : "none";
+      reason = isAdvisory
+        ? `advisory work detected but ChatGPT is not configured; degrading to ${route}`
+        : `chatgpt unavailable; using available worker`;
+    }
   } else if (isRepoWork) {
     // Step 5: repository inspection/modification.
     route = has("opencode") ? "opencode" : has("chatgpt") ? "chatgpt" : has("grokbot") ? "grokbot" : "none";
@@ -198,13 +227,22 @@ function fallbackRoute(
   // API (3) → reasoning (4) → repository (5) → GrokBot (6, last resort).
   if (has("deterministic") && deterministicKind) return "deterministic";
   if (has("api")) return "api";
-  if (has("chatgpt") && RESEARCH_INTENTS.some((re) => re.test(combined))) return "chatgpt";
+  if (has("chatgpt") && (RESEARCH_INTENTS.some((re) => re.test(combined)) || ADVISORY_INTENTS.some((re) => re.test(combined)))) return "chatgpt";
   if (has("opencode") && (isRepoWork || /code|repo|implement|fix|build|test|file/i.test(combined))) return "opencode";
   if (has("opencode")) return "opencode";
   if (has("chatgpt")) return "chatgpt";
   if (!forbidGrokbot && has("grokbot") && isGrokUnique) return "grokbot";
   if (!forbidGrokbot && has("grokbot")) return "grokbot";
   return "none";
+}
+
+/** Human-readable label for whichever advisory pattern fired, for the reason string. */
+function matchLabel(patterns: RegExp[], text: string): string {
+  for (const re of patterns) {
+    const m = re.exec(text);
+    if (m?.[0]) return m[0].toLowerCase();
+  }
+  return "advisory";
 }
 
 function estimateUsd(route: RouteValue, model: CostModel): number | null {

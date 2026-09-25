@@ -16,7 +16,11 @@ export default defineConfig({
       "@grokmax/providers": resolve("./packages/providers/src/index.ts"),
       "@grokmax/adapters": resolve("./packages/adapters/src/index.ts"),
       "@grokmax/telemetry": resolve("./packages/telemetry/src/index.ts"),
-      "@grokmax/doctor": resolve("./packages/doctor/src/index.ts")
+      "@grokmax/doctor": resolve("./packages/doctor/src/index.ts"),
+      "@grokmax/usage": resolve("./packages/usage/src/index.ts"),
+      "@grokmax/experiment": resolve("./packages/experiment/src/index.ts"),
+      "@grokmax/edge": resolve("./packages/edge/src/index.ts"),
+      "@grokmax/inbot": resolve("./packages/inbot/src/index.ts")
     }
   },
   test: {

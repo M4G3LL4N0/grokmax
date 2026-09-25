@@ -7,17 +7,24 @@
  *   grokmax optimize "<goal>"       full pipeline run, prints plan + outcome
  *   grokmax run <intent> <goal>     explicit run
  *   grokmax ask "<question>"        shorthand for intent=goal=question
+ *   grokmax edge "<task>"           complete work before GrokBot (Edge Mode)
+ *   grokmax preflight "<task>"      In-Bot preflight contract (for the GrokBot skill)
  *   grokmax route "<goal>"          routing decision only (no execution)
  *   grokmax dry-run "<goal>"        plan + outcome without executing
  *   grokmax explain <runId>         describe a completed run
  *   grokmax cache stats|prune|clear
  *   grokmax usage                   ledger summary
+ *   grokmax usage snapshot ...      provenance-aware platform usage observations
+ *   grokmax experiment ...          reproducible live experiment sessions
  *   grokmax savings                 honest savings report (proxy/measured)
  *   grokmax benchmark [suite...]    run benchmark suites against fixtures
  *   grokmax doctor                  health checks
  *   grokmax status                  overall system status
  */
 import { Command } from "commander";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { GrokMaxCache } from "@grokmax/cache";
 import { compile } from "@grokmax/compiler";
 import { sliceTaskContext } from "@grokmax/context";
@@ -29,10 +36,15 @@ import { Ledger } from "@grokmax/ledger";
 import { ArtifactStore, KnowledgeStore } from "@grokmax/artifacts";
 import type { ProviderRegistry } from "@grokmax/providers";
 import { createDefaultRegistry } from "@grokmax/adapters";
-import { GrokMaxEngine, type GrokMaxTask, type CompiledPrompt } from "@grokmax/core";
+import { GrokMaxEngine, canonicalHash, canonicalInput, type GrokMaxTask, type CompiledPrompt } from "@grokmax/core";
 import { runDoctor } from "@grokmax/doctor";
 import { computeSavings, savingsLine } from "@grokmax/telemetry";
+import { buildEdgeResult, edgeAvoidanceSummary, formatEdgeResult, type EdgeCriteria } from "@grokmax/edge";
+import { formatPreflight, preflight } from "@grokmax/inbot";
+import { UsageStore, platformUsageClaim, type UsageQuantity } from "@grokmax/usage";
+import { ExperimentStore } from "@grokmax/experiment";
 import { collectRawContext } from "./context.js";
+import { assertColdStateHonest, buildManifest, compareManifests, describeManifest, type BenchmarkManifest } from "./manifest.js";
 
 interface CliFlags {
   cwd: string;
@@ -50,6 +62,28 @@ function resolveFlags(opts: Record<string, unknown>): CliFlags {
   };
 }
 
+/** Commander accumulator for repeatable options (`--kind a --kind b`). */
+function collect<T>(map: (raw: string) => T = (raw) => raw as T): (value: string, previous: T[]) => T[] {
+  return (value, previous) => [...(previous ?? []), map(value)];
+}
+
+function flagsOf(opts: Record<string, unknown>): CliFlags {
+  return resolveFlags(opts);
+}
+
+/**
+ * Read the CLI version from its own package.json so `grokmax --version` cannot
+ * drift away from the published package version again.
+ */
+function readPackageVersion(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 function openCache(flags: CliFlags): GrokMaxCache {
   return new GrokMaxCache(process.env.GROKMAX_DB, { cwd: flags.cwd });
 }
@@ -184,6 +218,40 @@ function box(text: string): string {
   return `┌${ruler}┐\n│ ${text} │\n└${ruler}┘`;
 }
 
+/**
+ * Look for a previously completed result that the In-Bot preflight can hand
+ * straight back. Only a successful worker result qualifies: a cached failure
+ * is not an answer, and reusing it would tell the caller "already done" for
+ * work that never actually succeeded.
+ */
+async function findExistingResult(
+  cache: GrokMaxCache,
+  task: GrokMaxTask,
+  cacheChecks: Array<{ layer: string; hit: boolean; reason: string }>
+): Promise<{ summary: string; artifact?: string | null; status: string } | null> {
+  const hit = cacheChecks.find((c) => c.hit);
+  if (!hit) return null;
+  // A dry run reports cache state without returning the cached value, so ask
+  // the cache directly for the exact entry the lookup already found, using the
+  // engine's own canonical key.
+  const exact = cache.lookupExact(canonicalHash(canonicalInput(task)));
+  if (exact) {
+    const parsed = safeWorkerResult(exact.result);
+    if (parsed && parsed.status === "success") return { summary: parsed.summary, artifact: parsed.artifact ?? null, status: parsed.status };
+  }
+  return null;
+}
+
+function safeWorkerResult(raw: string): { status: string; summary: string; artifact?: string } | null {
+  try {
+    const v = JSON.parse(raw) as { status?: string; summary?: string; artifact?: string };
+    if (typeof v.status === "string" && typeof v.summary === "string") return { status: v.status, summary: v.summary, artifact: v.artifact };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const FRESHNESS_LABEL: Record<string, string> = {
   immutable: "immutable (no expiry)",
   slow: "7-day expiry",
@@ -198,7 +266,7 @@ async function main(): Promise<void> {
   program
     .name("grokmax")
     .description("Minimize GrokBot usage while maximizing verified useful output.")
-    .version("0.1.0")
+    .version(readPackageVersion())
     .option("--cwd <path>", "working directory", process.cwd());
 
   program
@@ -250,6 +318,73 @@ async function main(): Promise<void> {
         const rawContext = collectRawContext(makeTask(question, question, flags), flags.cwd);
         const out = await engine.run(makeTask(question, question, flags), { rawContext });
         console.log(out.outcome.summary);
+      } finally {
+        cache.close();
+      }
+    });
+
+  program
+    .command("edge <task>")
+    .description("Edge Mode: complete the task with the real pipeline, reaching for GrokBot only when genuinely required.")
+    .option("--fresh", "bypass cache and recompute")
+    .option("--json", "emit JSON")
+    .option("--summary-regex <re>", "contract: outcome summary must match this regex")
+    .option("--summary-contains <text>", "contract: outcome summary must contain this text")
+    .option("--min-evidence <n>", "contract: at least this many evidence items", (v) => Number(v))
+    .option("--require-artifact", "contract: an artifact reference must be produced")
+    .action(async (taskText: string, opts: Record<string, unknown>) => {
+      const flags = resolveFlags({ ...program.opts(), ...opts });
+      const cache = openCache(flags);
+      try {
+        const engine = buildEngine(cache, flags);
+        const task = makeTask(taskText, taskText, flags);
+        const rawContext = collectRawContext(task, flags.cwd);
+        const out = await engine.run(task, { rawContext });
+        const criteria: Partial<EdgeCriteria> = {};
+        if (typeof opts.summaryRegex === "string") criteria.summaryRegex = opts.summaryRegex;
+        if (typeof opts.summaryContains === "string") criteria.summaryContains = opts.summaryContains;
+        if (typeof opts.minEvidence === "number") criteria.minEvidence = opts.minEvidence;
+        if (opts.requireArtifact) criteria.requireArtifact = true;
+        const result = buildEdgeResult({ task, run: out, criteria });
+        if (flags.json) {
+          // The summary line is only meaningful for this single run, so it is
+          // reported as a one-task aggregate rather than a suite-level ratio.
+          console.log(JSON.stringify({ ...result, summaryLine: edgeAvoidanceSummary([result]) }, null, 2));
+        } else {
+          console.log(formatEdgeResult(result));
+        }
+        if (!result.success) process.exitCode = 1;
+      } finally {
+        cache.close();
+      }
+    });
+
+  program
+    .command("preflight <task>")
+    .description("In-Bot preflight: tell a GrokBot caller whether to reuse, delegate, or act.")
+    .option("--mode <mode>", "execution mode", "inbot")
+    .option("--mode-exec <mode>", "read the pre-existing result from a previous run (for cache-return tests)")
+    .option("--json", "emit JSON")
+    .action(async (taskText: string, opts: Record<string, unknown>) => {
+      const flags = resolveFlags({ ...program.opts(), ...opts });
+      const cache = openCache(flags);
+      try {
+        const engine = buildEngine(cache, flags);
+        const task = makeTask(taskText, taskText, flags);
+        // Preflight must not itself execute the work; it only decides.
+        const dry = await engine.run(task, { dryRunOnly: true });
+        const existing = await findExistingResult(cache, task, dry.cache);
+        const decision = routeTask(task, new Set(createDefaultRegistry().detectSet()), null, COST_MODEL);
+        const result = preflight({
+          task,
+          route: dry.route.route === "none" && decision.route !== "none" ? decision : dry.route,
+          cache: dry.cache,
+          existing,
+          taskId: dry.run.runId
+        });
+        if (flags.json) console.log(JSON.stringify(result, null, 2));
+        else console.log(formatPreflight(result));
+        if (result.action === "FAIL") process.exitCode = 1;
       } finally {
         cache.close();
       }
@@ -378,9 +513,9 @@ async function main(): Promise<void> {
       }
     });
 
-  program
+  const usageCmd = program
     .command("usage")
-    .description("Ledger summary with honest measured/estimated labels.")
+    .description("Ledger summary, or `grokmax usage snapshot ...` for provenance-aware platform observations.")
     .action(() => {
       const flags = resolveFlags(program.opts());
       const cache = openCache(flags);
@@ -402,6 +537,372 @@ async function main(): Promise<void> {
       } finally {
         cache.close();
       }
+    });
+
+  const snapshot = usageCmd
+    .command("snapshot")
+    .description("Provenance-aware platform usage observations (there is no Cursor billing API).");
+
+  snapshot
+    .command("add")
+    .description("Record an observed platform usage reading.")
+    .requiredOption("--label <label>", "short label for this observation")
+    .requiredOption("--source <source>", "cursor-ui | grokbot-ui | billing-page | csv-export | api | manual | unknown")
+    .requiredOption("--capture-method <method>", "manual | browser-observed | screenshot | csv-import | api-read | derived | unknown")
+    .requiredOption("--measurement-class <class>", "measured_platform | measured_ledger | proxy | estimated | unknown")
+    .option("--kind <kind>", "quantity kind", collect<string>())
+    .option("--value <n>", "numeric value", collect<number>((v) => Number(v)))
+    .option("--unit <unit>", "unit label", collect<string>())
+    .option("--precision <precision>", "displayed | range | derived | unknown", collect<string>())
+    .option("--range-low <n>", "low bound for a range observation", (v) => Number(v))
+    .option("--range-high <n>", "high bound for a range observation", (v) => Number(v))
+    .option("--notes <text>", "free-form notes")
+    .option("--json", "emit JSON")
+    .action((opts: Record<string, unknown>) => {
+      const flags = resolveFlags({ ...program.opts(), ...opts });
+      const cache = openCache(flags);
+      try {
+        const kinds = (opts.kind as string[]) ?? [];
+        const values = (opts.value as number[]) ?? [];
+        const units = (opts.unit as string[]) ?? [];
+        const precisions = (opts.precision as string[]) ?? [];
+        if (kinds.length !== values.length) {
+          console.error("--kind and --value must be supplied the same number of times.");
+          process.exitCode = 1;
+          return;
+        }
+        const quantities: UsageQuantity[] = kinds.map((kind, i) => {
+          const precision = (precisions[i] ?? "displayed") as UsageQuantity["precision"];
+          const q: UsageQuantity = { kind: kind as UsageQuantity["kind"], value: values[i] as number, unit: units[i] ?? "", precision };
+          if (typeof opts.rangeLow === "number" && typeof opts.rangeHigh === "number" && precision === "range") {
+            q.range = { low: opts.rangeLow, high: opts.rangeHigh };
+          }
+          return q;
+        });
+        const usage = new UsageStore(cache.store);
+        const snap = usage.add({
+          label: String(opts.label),
+          source: opts.source as never,
+          captureMethod: opts.captureMethod as never,
+          measurementClass: opts.measurementClass as never,
+          values: quantities,
+          notes: typeof opts.notes === "string" ? opts.notes : undefined
+        });
+        if (flags.json) console.log(JSON.stringify(snap, null, 2));
+        else {
+          console.log(`SNAPSHOT ${snap.id}  ${snap.label}`);
+          console.log(`  observed:   ${snap.observedAt}`);
+          console.log(`  source:     ${snap.source} / ${snap.captureMethod}`);
+          console.log(`  class:      ${snap.measurementClass} (precision: ${snap.precision})`);
+          for (const q of snap.values) console.log(`  - ${q.kind} = ${q.value}${q.unit}${q.range ? ` [${q.range.low}..${q.range.high}]` : ""} (${q.precision})`);
+        }
+      } finally {
+        cache.close();
+      }
+    });
+
+  snapshot
+    .command("list")
+    .description("List recorded platform usage observations.")
+    .option("--json", "emit JSON")
+    .action((opts: Record<string, unknown>) => {
+      const flags = resolveFlags({ ...program.opts(), ...opts });
+      const cache = openCache(flags);
+      try {
+        const usage = new UsageStore(cache.store);
+        const rows = usage.list(100);
+        if (flags.json) {
+          console.log(JSON.stringify(rows, null, 2));
+        } else if (rows.length === 0) {
+          console.log("no platform usage observations recorded.");
+        } else {
+          for (const r of rows) {
+            console.log(`${r.id}  ${r.label}  ${r.observedAt}  ${r.measurementClass}  ${r.source}/${r.captureMethod}  (${r.precision})`);
+          }
+        }
+      } finally {
+        cache.close();
+      }
+    });
+
+  snapshot
+    .command("diff")
+    .description("Compare two observations. Refuses when their measurement classes differ.")
+    .argument("<before>", "before snapshot id")
+    .argument("<after>", "after snapshot id")
+    .option("--json", "emit JSON")
+    .action((before: string, after: string, opts: Record<string, unknown>) => {
+      const flags = resolveFlags({ ...program.opts(), ...opts });
+      const cache = openCache(flags);
+      try {
+        const usage = new UsageStore(cache.store);
+        const d = usage.diff(before, after);
+        if (flags.json) {
+          console.log(JSON.stringify({ ...d, claim: platformUsageClaim(d) }, null, 2));
+        } else {
+          console.log(`COMPARABLE  ${d.comparable ? "yes" : "no"}`);
+          console.log(`CLASS      ${d.measurementClass}`);
+          console.log(`REASON     ${d.reason}`);
+          for (const c of d.changes) {
+            console.log(`  - ${c.kind}: ${c.before ?? "?"} -> ${c.after ?? "?"} (delta ${c.delta ?? "?"}${c.unit})`);
+          }
+          console.log(`CLAIM      ${platformUsageClaim(d)}`);
+        }
+      } finally {
+        cache.close();
+      }
+    });
+
+  const experiment = program.command("experiment")
+    .description("Reproducible live experiment sessions.");
+
+  experiment
+    .command("create <id>")
+    .description("Create an isolated experiment session.")
+    .requiredOption("--mode <mode>", "native | inbot | edge")
+    .option("--cache-state <state>", "cold | warm", "cold")
+    .option("--task-fixture-version <v>", "task fixture version", "v1")
+    .option("--repo-fixture-version <v>", "repo fixture version")
+    .option("--git-sha <sha>", "git SHA of the code under test")
+    .option("--json", "emit JSON")
+    .action((id: string, opts: Record<string, unknown>) => {
+      const flags = resolveFlags({ ...program.opts(), ...opts });
+      const cache = openCache(flags);
+      try {
+        const experiments = new ExperimentStore(cache.store);
+        const session = experiments.create({
+          id,
+          mode: opts.mode as never,
+          cacheState: (opts.cacheState ?? "cold") as never,
+          taskFixtureVersion: String(opts.taskFixtureVersion ?? "v1"),
+          repoFixtureVersion: typeof opts.repoFixtureVersion === "string" ? opts.repoFixtureVersion : undefined,
+          gitSha: typeof opts.gitSha === "string" ? opts.gitSha : undefined,
+          config: { mode: opts.mode, cacheState: opts.cacheState ?? "cold" }
+        });
+        if (flags.json) console.log(JSON.stringify(session, null, 2));
+        else {
+          console.log(`SESSION  ${session.id}`);
+          console.log(`  mode:          ${session.mode}`);
+          console.log(`  cache state:   ${session.cacheState}`);
+          console.log(`  db namespace:  ${session.dbNamespace}`);
+          console.log(`  cache ns:      ${session.cacheNamespace}`);
+          console.log(`  task fixtures: ${session.taskFixtureVersion}`);
+          console.log(`  config fp:     ${session.configFingerprint}`);
+        }
+      } finally {
+        cache.close();
+      }
+    });
+
+  experiment
+    .command("record <sessionId> <taskId>")
+    .description("Record a task result inside an experiment session.")
+    .option("--status <status>", "worker status", "success")
+    .option("--success", "task completed successfully", true)
+    .option("--no-success", "task did not complete")
+    .option("--grokbot-required", "router required GrokBot")
+    .option("--grokbot-invoked", "GrokBot was actually invoked")
+    .option("--cache-state <state>", "cold | warm")
+    .option("--cache-layer <layer>", "cache layer that answered")
+    .option("--executor <executor>", "executor that ran")
+    .option("--route <route>", "route chosen")
+    .option("--elapsed-ms <n>", "elapsed milliseconds", (v) => Number(v), 0)
+    .option("--retries <n>", "retry count", (v) => Number(v), 0)
+    .option("--context-before <n>", "context chars before", (v) => Number(v))
+    .option("--context-after <n>", "context chars after", (v) => Number(v))
+    .option("--external-cost-usd <n>", "external worker cost", (v) => Number(v))
+    .option("--artifact <ref>", "artifact reference")
+    .option("--json", "emit JSON")
+    .action((sessionId: string, taskId: string, opts: Record<string, unknown>) => {
+      const flags = resolveFlags({ ...program.opts(), ...opts });
+      const cache = openCache(flags);
+      try {
+        const experiments = new ExperimentStore(cache.store);
+        const session = experiments.get(sessionId);
+        if (!session) {
+          console.error(`session not found: ${sessionId}`);
+          process.exitCode = 1;
+          return;
+        }
+        const rec = experiments.record(sessionId, {
+          taskId,
+          status: String(opts.status ?? "success"),
+          success: opts.success !== false,
+          grokbotRequired: Boolean(opts.grokbotRequired),
+          grokbotInvoked: Boolean(opts.grokbotInvoked),
+          cacheState: (opts.cacheState ?? session.cacheState) as never,
+          cacheLayer: typeof opts.cacheLayer === "string" ? opts.cacheLayer : null,
+          executor: typeof opts.executor === "string" ? opts.executor : null,
+          route: typeof opts.route === "string" ? opts.route : null,
+          elapsedMs: Number(opts.elapsedMs ?? 0),
+          retries: Number(opts.retries ?? 0),
+          contextBefore: typeof opts.contextBefore === "number" ? opts.contextBefore : null,
+          contextAfter: typeof opts.contextAfter === "number" ? opts.contextAfter : null,
+          externalCostUsd: typeof opts.externalCostUsd === "number" ? opts.externalCostUsd : null,
+          artifact: typeof opts.artifact === "string" ? opts.artifact : null
+        });
+        if (flags.json) console.log(JSON.stringify(rec, null, 2));
+        else {
+          console.log(`RECORDED ${sessionId}/${taskId}`);
+          console.log(`  success:       ${rec.success}`);
+          console.log(`  grokbot:       required=${rec.grokbotRequired} invoked=${rec.grokbotInvoked}`);
+          console.log(`  criteria met:  ${rec.criteriaMet}`);
+          console.log(`  counted avoided: ${rec.success && !rec.grokbotInvoked && rec.criteriaMet === true}`);
+        }
+      } finally {
+        cache.close();
+      }
+    });
+
+  experiment
+    .command("attach-snapshot <sessionId>")
+    .description("Attach a usage snapshot to a session as its before or after observation.")
+    .argument("<which>", "before | after")
+    .argument("<snapshotId>", "usage snapshot id")
+    .action((sessionId: string, which: string, snapshotId: string) => {
+      const flags = resolveFlags(program.opts());
+      const cache = openCache(flags);
+      try {
+        const experiments = new ExperimentStore(cache.store);
+        if (which !== "before" && which !== "after") {
+          console.error("which must be 'before' or 'after'");
+          process.exitCode = 1;
+          return;
+        }
+        experiments.attachSnapshot(sessionId, which, snapshotId);
+        console.log(`attached ${which} snapshot ${snapshotId} to ${sessionId}`);
+      } finally {
+        cache.close();
+      }
+    });
+
+  experiment
+    .command("report <sessionId>")
+    .description("Summarize a session, distinguishing eligible tasks from genuine avoidances.")
+    .option("--json", "emit JSON")
+    .action((sessionId: string, opts: Record<string, unknown>) => {
+      const flags = resolveFlags({ ...program.opts(), ...opts });
+      const cache = openCache(flags);
+      try {
+        const experiments = new ExperimentStore(cache.store);
+        const session = experiments.get(sessionId);
+        if (!session) {
+          console.error(`session not found: ${sessionId}`);
+          process.exitCode = 1;
+          return;
+        }
+        const records = experiments.records(sessionId);
+        const avoided = experiments.avoidedCount(sessionId);
+        const report = {
+          session: session.id,
+          mode: session.mode,
+          cacheState: session.cacheState,
+          taskFixtureVersion: session.taskFixtureVersion,
+          gitSha: session.gitSha,
+          eligibleTasks: experiments.eligibleCount(sessionId),
+          genuineAvoidances: avoided,
+          grokbotInvocations: records.filter((r) => r.grokbotInvoked).length,
+          failures: records.filter((r) => !r.success).length,
+          beforeSnapshotId: session.beforeSnapshotId,
+          afterSnapshotId: session.afterSnapshotId,
+          platformUsage: session.beforeSnapshotId && session.afterSnapshotId ? "see `grokmax usage snapshot diff`" : "unknown"
+        };
+        if (flags.json) console.log(JSON.stringify(report, null, 2));
+        else {
+          console.log(`SESSION ${report.session}  mode=${report.mode}  cache=${report.cacheState}`);
+          console.log(`  eligible tasks:      ${report.eligibleTasks}`);
+          console.log(`  genuine avoidances:  ${report.genuineAvoidances}`);
+          console.log(`  grokbot invocations: ${report.grokbotInvocations}`);
+          console.log(`  failures:            ${report.failures}`);
+          console.log(`  platform usage:      ${report.platformUsage}`);
+        }
+      } finally {
+        cache.close();
+      }
+    });
+
+  const bench = program
+    .command("bench")
+    .description("Benchmark manifest tooling that makes mode/cold-warm contamination detectable.");
+
+  bench
+    .command("manifest")
+    .description("Build a manifest for a benchmark run, with an isolated cache namespace.")
+    .requiredOption("--name <name>", "run name")
+    .option("--suite-version <v>", "suite version", "v1.0.0")
+    .requiredOption("--mode <mode>", "native | inbot | edge")
+    .requiredOption("--cache-state <state>", "cold | warm")
+    .option("--state-reset <reset>", "fresh-namespace | prune | none", (v) => v)
+    .option("--task-fixture-version <v>", "task fixture version", "v1.0.0")
+    .option("--repo-fixture-version <v>", "repo fixture version")
+    .option("--repo-fixture-path <p>", "disposable fixture repo path")
+    .option("--capability <class>", "deterministic | reasoning | repository | browser | cache", "deterministic")
+    .option("--git-sha <sha>", "git SHA under test")
+    .option("--json", "emit JSON")
+    .action((opts: Record<string, unknown>) => {
+      const manifest = buildManifest({
+        name: String(opts.name),
+        version: String(opts.suiteVersion ?? "v1.0.0"),
+        mode: opts.mode as never,
+        cacheState: opts.cacheState as never,
+        stateReset: (opts.stateReset ?? (opts.cacheState === "cold" ? "fresh-namespace" : "none")) as never,
+        taskFixtureVersion: String(opts.taskFixtureVersion ?? "v1.0.0"),
+        repoFixtureVersion: typeof opts.repoFixtureVersion === "string" ? opts.repoFixtureVersion : null,
+        repoFixturePath: typeof opts.repoFixturePath === "string" ? opts.repoFixturePath : null,
+        gitSha: typeof opts.gitSha === "string" ? opts.gitSha : null,
+        capabilityClass: opts.capability as never
+      });
+      if (flagsOf(opts).json) console.log(JSON.stringify(manifest, null, 2));
+      else console.log(describeManifest(manifest));
+    });
+
+  bench
+    .command("compare")
+    .description("Compare two manifests and refuse when they are not comparable.")
+    .requiredOption("--a <path>", "first manifest JSON path")
+    .requiredOption("--b <path>", "second manifest JSON path")
+    .option("--json", "emit JSON")
+    .action((opts: Record<string, unknown>) => {
+      const a = JSON.parse(readFileSync(String(opts.a), "utf8")) as BenchmarkManifest;
+      const b = JSON.parse(readFileSync(String(opts.b), "utf8")) as BenchmarkManifest;
+      const verdict = compareManifests(a, b);
+      if (flagsOf(opts).json) console.log(JSON.stringify(verdict, null, 2));
+      else {
+        console.log(`COMPARABLE ${verdict.comparable ? "yes" : "no"}`);
+        console.log(`REASON     ${verdict.reason}`);
+        for (const d of verdict.differences) console.log(`  - ${d}`);
+      }
+      if (!verdict.comparable) process.exitCode = 1;
+    });
+
+  bench
+    .command("assert-cold")
+    .description("Fail a cold run that reused an existing cache namespace.")
+    .requiredOption("--manifest <path>", "manifest JSON path")
+    .requiredOption("--namespace-exists", "set when the namespace already exists on disk")
+    .action((opts: Record<string, unknown>) => {
+      const m = JSON.parse(readFileSync(String(opts.manifest), "utf8")) as BenchmarkManifest;
+      assertColdStateHonest(m, Boolean(opts.namespaceExists));
+      console.log(`cold state OK for ${m.name} (namespace ${m.cacheNamespace})`);
+    });
+
+  bench
+    .command("reset-fixture")
+    .description("Recreate a disposable fixture repo from its fixture.json so edits cannot leak between modes.")
+    .requiredOption("--path <p>", "fixture repo path")
+    .action((opts: Record<string, unknown>) => {
+      const p = String(opts.path);
+      const spec = JSON.parse(readFileSync(join(p, "fixture.json"), "utf8")) as {
+        name: string;
+        version: string;
+        files: Array<{ path: string; content: string }>;
+      };
+      for (const f of spec.files) {
+        const target = join(p, f.path);
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, f.content, "utf8");
+      }
+      console.log(`reset fixture ${spec.name}@${spec.version} (${spec.files.length} files) in ${p}`);
     });
 
   program

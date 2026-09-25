@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/context",
-  "version": "0.1.1",
+  "version": "0.2.0-rc.1",
   "description": "GrokMax context slicer: keep only task-relevant context, with proof.",
   "license": "MIT",
   "type": "module",

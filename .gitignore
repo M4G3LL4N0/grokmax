@@ -8,7 +8,7 @@ data/artifacts/
 !.env.example
 *.log
 .DS_Store
-benchmarks/results/raw/*.json
+benchmarks/results/raw/
 benchmarks/results/.cache/
 *.d.ts.map
 *.js.map

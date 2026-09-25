@@ -1,0 +1,444 @@
+{
+  "title": "GrokMax v0.1.1 Independent Adversarial Verification \u2014 Publication Summary",
+  "generated_at": "2026-09-24T13:47:30-06:00",
+  "timezone_label": "MDT",
+  "candidate": {
+    "core_sha": "42f6da543af04a4eb1adbf4fe11bb82dc2b599cc",
+    "core_tag": "v0.1.1",
+    "website_sha": "a4718fcae0cbd4dc692717592230774394d2cf2a",
+    "previously_audited": "fd9c017981d5aa96eb36aed6b5ca8da5b578b0f6",
+    "intermediate_pr1": "daeef3907b512e1dc339b332c15761c08f202eb8",
+    "label": "measured"
+  },
+  "environment_gates": {
+    "host": "box",
+    "matador": "not_used",
+    "clone": "/tmp/grokmax-v011-verify",
+    "node": "v24.21.0",
+    "pnpm": "9.15.9",
+    "vitest": "3.2.7",
+    "GROKMAX_GROKBOT_BRIDGE": "unset",
+    "product_source_modified": false,
+    "label": "measured"
+  },
+  "gateA": {
+    "F1_numeric_collision": {
+      "verdict": "PASS",
+      "label": "measured",
+      "evidence": [
+        "raw/f1-seed.json",
+        "raw/f1-50.json",
+        "raw/f1-500.json",
+        "raw/f1-18x7.json",
+        "raw/f1-19x7.json",
+        "raw/f1-cache-stats.txt"
+      ]
+    },
+    "F2_negation_budget": {
+      "verdict": "PASS",
+      "label": "measured",
+      "method": "engine_stub_plus_lookupSemantic",
+      "cli_note": "deploy/budget CLI fails without provider so does not store; engine stub is authoritative",
+      "evidence": [
+        "raw/f2-gateBC-engine.json",
+        "raw/f2-seed-donot.json",
+        "raw/f2-probe-deploy.json",
+        "raw/f2-seed-budget50.json",
+        "raw/f2-probe-budget500.json"
+      ]
+    },
+    "fresh_bypass": {
+      "verdict": "PASS",
+      "label": "measured",
+      "evidence": [
+        "raw/fresh-seed.json",
+        "raw/fresh-warm.json",
+        "raw/fresh-after.json"
+      ]
+    },
+    "opencode_nonzero_exit": {
+      "verdict": "PASS",
+      "label": "measured",
+      "method": "unit_tests",
+      "tests_passed": 10,
+      "evidence": [
+        "raw/opencode-vitest.txt"
+      ]
+    },
+    "metric_integrity": {
+      "verdict": "PASS",
+      "label": "measured",
+      "cli_savings_method": "proxy",
+      "measured_avoidance_inflated_by_proxy": false,
+      "evidence": [
+        "raw/cli-savings.json",
+        "raw/cli-usage.txt",
+        "raw/savings-vitest.txt"
+      ]
+    },
+    "path_escape": {
+      "verdict": "PASS",
+      "label": "measured",
+      "tests_passed": 17,
+      "evidence": [
+        "raw/path-escape-vitest.txt"
+      ]
+    },
+    "gateA_critical_unresolved": false
+  },
+  "gateB": {
+    "pass_count": 21,
+    "total": 22,
+    "fail_list": [
+      {
+        "seed": "Use operator +",
+        "probe": "Use operator *",
+        "verdict": "FAIL_UNSAFE_HIT",
+        "note": "bare operators without digits not in critical literal extract"
+      }
+    ],
+    "residual_validatePreservation_substring": {
+      "case": "budget $50 vs budget $500",
+      "ok_incorrectly_true": true,
+      "label": "observed",
+      "note": "L3 currency gate still separates; preservation detector substring weakness"
+    },
+    "evidence": [
+      "raw/f2-gateBC-engine.json"
+    ],
+    "label": "measured"
+  },
+  "gateC": {
+    "FP": 0,
+    "FN": 2,
+    "pairs": [
+      {
+        "seed": "Write tests for the cache package",
+        "probe": "Please could you write tests for the cache package",
+        "hit": true,
+        "FN": false,
+        "FP": false
+      },
+      {
+        "seed": "Summarize the architecture of this repository",
+        "probe": "Give me a high-level architecture summary for this repo",
+        "hit": false,
+        "FN": true,
+        "FP": false
+      },
+      {
+        "seed": "Run the tests in the top-level directory",
+        "probe": "Run every test from the root of the repo",
+        "hit": false,
+        "FN": true,
+        "FP": false
+      }
+    ],
+    "label": "measured",
+    "evidence": [
+      "raw/f2-gateBC-engine.json"
+    ]
+  },
+  "gateD": {
+    "install": {
+      "exit": 0,
+      "label": "measured"
+    },
+    "lint": {
+      "exit": 0,
+      "label": "measured"
+    },
+    "typecheck": {
+      "exit": 0,
+      "label": "measured"
+    },
+    "test": {
+      "files_passed": 19,
+      "tests_passed": 163,
+      "tests_failed": 0,
+      "label": "measured"
+    },
+    "build": {
+      "exit": 0,
+      "concurrency_workaround_needed": false,
+      "note": "package.json already sets workspace-concurrency=2",
+      "label": "measured"
+    },
+    "doctor": {
+      "status": "WARNING",
+      "healthy": 15,
+      "warning": 4,
+      "failure": 0,
+      "label": "measured",
+      "warnings": [
+        "data/ not created",
+        "opencode CLI missing",
+        "GROKMAX_GROKBOT_BRIDGE unset",
+        "benchmark-fixtures false-negative via cwd.endsWith('grokmax') heuristic"
+      ]
+    },
+    "audit": {
+      "vulnerabilities": {
+        "low": 1,
+        "moderate": 2,
+        "high": 0
+      },
+      "label": "observed"
+    },
+    "benchmark_cold": {
+      "fixtures": 33,
+      "suites": 5,
+      "resolve_accuracy_pct": 100,
+      "outcome_accuracy_pct": 100,
+      "grokbot_required": 0,
+      "label": "measured"
+    },
+    "benchmark_warm": {
+      "fixtures": 33,
+      "suites": 5,
+      "resolve_accuracy_pct": 100,
+      "outcome_accuracy_pct": 100,
+      "grokbot_required": 0,
+      "label": "measured"
+    },
+    "node": "v24.21.0",
+    "pnpm": "9.15.9",
+    "evidence": [
+      "raw/pnpm-install.txt",
+      "raw/pnpm-lint.txt",
+      "raw/pnpm-typecheck.txt",
+      "raw/pnpm-test.txt",
+      "raw/pnpm-build.txt",
+      "raw/pnpm-audit.txt",
+      "raw/doctor.txt",
+      "raw/benchmark-cold.json",
+      "raw/benchmark-warm.json",
+      "raw/versions.txt"
+    ]
+  },
+  "website_gateE": {
+    "sha": "a4718fcae0cbd4dc692717592230774394d2cf2a",
+    "disclaimer_present": true,
+    "disclaimer_excerpt": "GrokMax is an independent, open-source project. It is not affiliated with, endorsed by, or sponsored by Cursor, xAI, or any other platform vendor.",
+    "claim_mismatches": [
+      {
+        "claim": "151 tests across 18 files",
+        "measured": "163 tests across 19 files",
+        "mismatch": true
+      },
+      {
+        "claim": "33 fixtures \u00b7 5 suites \u00b7 100% match",
+        "measured": "33 fixtures \u00b7 5 suites \u00b7 100% match",
+        "mismatch": false
+      }
+    ],
+    "edge_inbot_adapters": "missing_product",
+    "product_adapters_observed": [
+      "api",
+      "chatgpt",
+      "deterministic",
+      "grokbot",
+      "opencode"
+    ],
+    "label": "observed",
+    "evidence": [
+      "raw/website-claims.json"
+    ]
+  },
+  "live": {
+    "generated_at": "2026-09-24T13:47:30-06:00",
+    "sha": "42f6da543af04a4eb1adbf4fe11bb82dc2b599cc",
+    "tag": "v0.1.1",
+    "modes_availability": {
+      "A_native": "partial \u2014 for math/hash = deterministic cold without prior cache; for browser = deferred",
+      "B_in_bot": "NOT_IMPLEMENTED (rg: 0 matches)",
+      "C_edge": "NOT_IMPLEMENTED (rg: 0 matches)",
+      "grokmax_cli": "available (C-alternative; not Edge)"
+    },
+    "official_cursor_usage": "not_observable",
+    "savings_method": "proxy",
+    "ledger_totals": {
+      "runs": 12,
+      "successes": 9,
+      "failures": 2,
+      "cache_hits": 3,
+      "grokbot_used": 1,
+      "grokbot_avoided_est": 11,
+      "grokbot_avoided_measured": 0,
+      "context_before_chars": 103392,
+      "context_after_chars": 16048,
+      "elapsed_total_ms": 42286,
+      "estimated_usd_spent": 1.0,
+      "estimated_usd_label": "measured_ledger_not_platform",
+      "label": "measured"
+    },
+    "savings_report": {
+      "generatedAt": "2026-09-24T19:47:09.697Z",
+      "method": "proxy",
+      "eligibleTasks": 12,
+      "tasksAvoidingGrokBot": 11,
+      "tasksRequiringGrokBot": 1,
+      "contextBeforeCharsMedian": 2006,
+      "contextAfterCharsMedian": 2006,
+      "contextReductionPctMedian": 0,
+      "cacheHitRate": {
+        "hits": 3,
+        "total": 12,
+        "pct": 25
+      },
+      "caveats": [
+        "GrokBot platform usage is not directly observable; avoided-GrokBot counts are router-level proxies unless manually measured.",
+        "Context reduction is a proxy for token cost, not a measurement of tokens billed."
+      ],
+      "label": "proxy"
+    },
+    "live_grokbot": {
+      "completed_this_candidate": 1,
+      "deferred_pending": 0,
+      "job_ids": [
+        "20260924T134606-1153001-31567"
+      ],
+      "prior_historical_bridge_success": {
+        "sha": "daeef3907b512e1dc339b332c15761c08f202eb8",
+        "job_id": "20260924T120308-1109200-8505",
+        "note": "historical only; earlier PR#1 SHA; not counted as this candidate live run",
+        "label": "historical"
+      },
+      "label": "measured"
+    },
+    "scenario_statuses": [
+      {
+        "id": 1,
+        "name": "exact_repeated_request_math_7x8",
+        "status": "completed"
+      },
+      {
+        "id": 2,
+        "name": "paraphrased_repeated_request",
+        "status": "completed"
+      },
+      {
+        "id": 3,
+        "name": "long_context_small_task",
+        "status": "completed"
+      },
+      {
+        "id": 4,
+        "name": "repository_analysis",
+        "status": "completed_route_only"
+      },
+      {
+        "id": 5,
+        "name": "repository_modification",
+        "status": "completed_route_and_dry_run_only"
+      },
+      {
+        "id": 6,
+        "name": "current_web_research",
+        "status": "completed_route_only"
+      },
+      {
+        "id": 7,
+        "name": "reusable_artifact_task",
+        "status": "not_run"
+      },
+      {
+        "id": 8,
+        "name": "task_requiring_grokbot_browser_example_com",
+        "status": "completed"
+      },
+      {
+        "id": 9,
+        "name": "task_not_requiring_grokbot",
+        "status": "completed"
+      },
+      {
+        "id": 10,
+        "name": "warm_cache_repeat_after_s1",
+        "status": "completed"
+      }
+    ],
+    "s8": {
+      "status": "completed",
+      "job_id": "20260924T134606-1153001-31567",
+      "plan_route": "GROKBOT",
+      "grokbotRequired": true,
+      "cacheLayer": "MISS",
+      "exit": 0,
+      "outcome": "Main heading: Example Domains. Final URL: https://www.iana.org/help/example-domains. Secondary heading: Further Reading.",
+      "completion_method": "computerUse_box_desktop",
+      "estimated_usd_ledger": 1.0,
+      "estimated_usd_label": "measured_ledger_not_platform",
+      "label": "measured"
+    },
+    "evidence_roots": [
+      "live/LIVE.md",
+      "live/live-summary.json",
+      "live/raw/",
+      "benchmarks-results/raw/"
+    ]
+  },
+  "scorecard": {
+    "RELEASE_CANDIDATE": "v0.1.1 @ 42f6da543af04a4eb1adbf4fe11bb82dc2b599cc (website a4718fcae0cbd4dc692717592230774394d2cf2a)",
+    "REGRESSION": "F1/F2 CRITICAL no longer reproduce (measured); Gate B bare +/* residual FAIL_UNSAFE_HIT (measured)",
+    "TESTS": "163 passed / 19 files / 0 failed (measured)",
+    "BENCHMARK_cold": "33 fixtures / 5 suites / 100% resolve / 100% outcome / 0 grokbot (measured, deterministic-only)",
+    "BENCHMARK_warm": "33 fixtures / 5 suites / 100% resolve / 100% outcome / 0 grokbot (measured, deterministic-only)",
+    "LIVE_GROKBOT": "1 controlled live run completed on this candidate (job 20260924T134606-1153001-31567, measured); prior bridge success on daeef390 historical only",
+    "GROKBOT_AVOIDANCE": "measured: 0; proxy/est avoided: 11; method: proxy",
+    "CONTEXT": "proxy chars 103392 \u2192 16048 (not billed tokens)",
+    "QUALITY": "deterministic math/hash success-equivalent Y where exercised; NL paraphrase brittle; repo/web route-only",
+    "COST": "ledger estimated_usd_spent 1.0000 (measured_ledger_not_platform); official Cursor usage not_observable",
+    "SECURITY_remaining": "path escape tests PASS; Gate B bare-operator residual; validatePreservation $50\u2282$500 substring weakness (observed)",
+    "READY_TO_PUBLISH": "NO"
+  },
+  "safe_public_claims": [
+    "CRITICAL F1 (numeric L3 collision) and F2 (negation/budget collision) reproduced at fd9c017 and verified fixed on v0.1.1 42f6da (and intermediate PR#1 daeef390).",
+    "pnpm test: 163 tests across 19 files, 0 failed (measured on box clone).",
+    "Deterministic benchmark cold+warm: 33 fixtures, 5 suites, 100% resolve/outcome, grokbotRequired 0 (deterministic-only).",
+    "One controlled LIVE GrokBot browser task on this candidate succeeded via audit bridge harness + computerUse_box_desktop (Example Domains / IANA help URL); ledger grokbot used 1; estimated USD 1.0 is measured_ledger_not_platform.",
+    "CLI savings method remains proxy; platform GrokBot avoidance measured count is 0.",
+    "Website footer disclaimer present (independent / not affiliated with Cursor, xAI)."
+  ],
+  "do_not_claim": [
+    "Ready to publish full verification / marketing live-savings claims",
+    "Measured Cursor Usage & Billing or account $ savings (not_observable)",
+    "In-Bot or Edge modes as shipping products (NOT_IMPLEMENTED / missing_product)",
+    "Website '151 tests / 18 files' as current truth (measured 163 / 19)",
+    "Savings method as platform-measured (it is proxy)",
+    "Audit bridge harness as a customer-shipped GrokBot bridge",
+    "Absolute always-cheaper / never-uses-GrokBot language",
+    "Gate B fully cleared (bare operator +/* residual FAIL_UNSAFE_HIT)",
+    "Concealing that CRITICAL F1/F2 existed at fd9c017"
+  ],
+  "publication_readiness": {
+    "verdict": "NOT_READY",
+    "ready_to_publish": false,
+    "reasons": [
+      "Website test count stale: claims 151/18 files vs measured 163/19 files",
+      "In-Bot and Edge modes NOT_IMPLEMENTED (missing_product)",
+      "Official Cursor Usage & Billing not_observable \u2014 do not invent platform savings",
+      "Savings method remains proxy; grokbot-avoided (measured): 0",
+      "Gate B residual: bare operator + vs * FAIL_UNSAFE_HIT",
+      "One controlled live GrokBot run measured on this candidate via audit bridge harness \u2014 not proof of product-shipped bridge or platform billing"
+    ],
+    "what_was_shown": [
+      "Deterministic math cold/warm exact cache hit works",
+      "Spacing paraphrase can hit L3 semantic for Calculate 7*8 family",
+      "GrokBot not invoked for hash/math even when bridge configured",
+      "Router classifies repo/research/grokbot-unique intents when providers absent",
+      "One controlled LIVE GrokBot browser optimize on v0.1.1 (42f6da) succeeded via audit bridge + computerUse_box_desktop (Example Domains)"
+    ],
+    "label": "observed"
+  },
+  "evidence": {
+    "gates_md": "GATE-A-D.md",
+    "candidate_json": "candidate.json",
+    "verification_md": "GROKBOT-VERIFICATION.md",
+    "live_md": "live/LIVE.md",
+    "live_json": "live/live-summary.json",
+    "raw_gate": "raw/",
+    "raw_live": "live/raw/",
+    "raw_publication": "benchmarks-results/raw/"
+  }
+}

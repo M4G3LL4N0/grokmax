@@ -83,6 +83,72 @@ CREATE TABLE IF NOT EXISTS ledger (
   payload TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
+
+-- Honest platform-usage observations. Every row carries provenance and a
+-- measurement class; a class is never inferred or silently upgraded.
+CREATE TABLE IF NOT EXISTS usage_snapshots (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  observed_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  capture_method TEXT NOT NULL,
+  measurement_class TEXT NOT NULL,
+  precision TEXT NOT NULL,
+  session_id TEXT,
+  quantities TEXT NOT NULL,
+  notes TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_snapshots_label ON usage_snapshots(label, observed_at);
+
+-- Reproducible live experiment sessions. Isolated db/cache namespaces keep a
+-- warm native run from contaminating a cold edge run.
+CREATE TABLE IF NOT EXISTS experiment_sessions (
+  id TEXT PRIMARY KEY,
+  mode TEXT NOT NULL,
+  cache_state TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  git_sha TEXT,
+  task_fixture_version TEXT NOT NULL,
+  repo_fixture_version TEXT,
+  config_fingerprint TEXT NOT NULL,
+  db_namespace TEXT NOT NULL,
+  cache_namespace TEXT NOT NULL,
+  before_snapshot_id TEXT,
+  after_snapshot_id TEXT,
+  criteria TEXT NOT NULL,
+  manifest TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS experiment_records (
+  session_id TEXT NOT NULL,
+  task_id TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  route TEXT,
+  executor TEXT,
+  cache_layer TEXT,
+  status TEXT NOT NULL,
+  success INTEGER NOT NULL,
+  grokbot_required INTEGER NOT NULL,
+  grokbot_invoked INTEGER NOT NULL,
+  cache_state TEXT NOT NULL,
+  context_before INTEGER,
+  context_after INTEGER,
+  external_cost_usd REAL,
+  elapsed_ms INTEGER NOT NULL,
+  retries INTEGER NOT NULL,
+  artifact TEXT,
+  criteria_met INTEGER,
+  result TEXT NOT NULL,
+  PRIMARY KEY (session_id, task_id, mode),
+  FOREIGN KEY (session_id) REFERENCES experiment_sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_experiment_records_session ON experiment_records(session_id);
 `;
 
 export class SqliteStore {
