@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/experiment",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "description": "Reproducible live experiment sessions with isolated namespaces and cache-state control.",
   "license": "MIT",
   "type": "module",

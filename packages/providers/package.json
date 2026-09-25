@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/providers",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "description": "GrokMax provider contracts and registry with graceful degradation.",
   "license": "MIT",
   "type": "module",

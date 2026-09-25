@@ -146,12 +146,131 @@ export interface CriticalLiterals {
   hashes: string[];
   identifiers: string[];
   keywords: string[];
+  /**
+   * Ordered action fingerprint for sequence-bearing instructions.
+   *
+   * Empty when the text contains no sequencing marker, which is the common
+   * case: ordinary paraphrase ("summarize the architecture of this repository"
+   * vs "give me a high-level architecture summary for this repo") reorders
+   * words freely without changing meaning, so a global order requirement
+   * would destroy legitimate cache reuse.
+   *
+   * When a marker IS present, the instruction is an ordered procedure and the
+   * order of its content words is load-bearing. The fingerprint keeps the
+   * content words in encounter order with markers and filler removed, so
+   * "roll back ... then drain" and "drain ... then roll back" are different
+   * requests even though their bag-of-words is identical.
+   */
+  order: string[];
 }
 
 const VALUE_STOP = new Set(["not", "no", "the", "a", "an", "to", "of", "for", "and", "or", "in", "on", "at", "is", "are", "was", "were", "be", "with", "from", "by", "it", "its", "this", "that", "do", "does", "did", "will"]);
 const KEYWORDS = ["branch", "repo", "repository", "version", "file", "filename", "dir", "directory", "path", "package", "port", "endpoint", "url", "env", "var", "token", "secret", "model", "engine", "runtime", "db", "database", "sha256", "sha1", "md5"];
 const NEGATION_WORDS = ["not", "never", "no", "without", "unless", "cannot", "won't", "don't", "can't", "isn't", "aren't", "doesn't", "didn't", "must not", "do not", "should not", "no longer", "no more"];
 const MODALITY_WORDS = ["only", "exactly", "must", "should", "before", "after", "until", "always", "at least", "at most"];
+
+/**
+ * Words that mark an instruction as an ordered procedure. The presence of any
+ * one of them is what makes word order load-bearing, so this set is the trigger
+ * for the order gate.
+ */
+const SEQUENCE_MARKERS = new Set([
+  "first",
+  "firstly",
+  "then",
+  "next",
+  "second",
+  "secondly",
+  "third",
+  "thirdly",
+  "before",
+  "after",
+  "afterwards",
+  "afterward",
+  "finally",
+  "lastly",
+  "subsequently",
+  "prior",
+  "followed",
+  "following"
+]);
+
+/**
+ * Filler dropped from the ordered fingerprint. Mirrors the general stop list so
+ * an ordered procedure and its paraphrase agree on what counts as content.
+ */
+const ORDER_NOISE = new Set([
+  "please",
+  "the",
+  "and",
+  "with",
+  "for",
+  "you",
+  "your",
+  "this",
+  "that",
+  "can",
+  "could",
+  "would",
+  "give",
+  "need",
+  "want",
+  "should",
+  "from",
+  "into",
+  "about",
+  "where",
+  "when",
+  "what",
+  "have",
+  "been",
+  "will",
+  "are",
+  "was",
+  "were",
+  "does",
+  "do",
+  "did",
+  "is",
+  "of",
+  "to",
+  "in",
+  "on",
+  "at",
+  "by",
+  "a",
+  "an",
+  "it",
+  "its",
+  "as"
+]);
+
+/**
+ * Ordered content-word fingerprint for sequence-bearing instructions.
+ *
+ * Returns an empty array when the text carries no sequencing marker, because
+ * only then does order carry meaning. When it does, markers and filler are
+ * stripped and the remaining content words are returned in encounter order, so
+ * a reordering of the same words is detected as a different request.
+ */
+function extractOrderFingerprint(text: string): string[] {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!tokens.some((t) => SEQUENCE_MARKERS.has(t))) return [];
+
+  const seq: string[] = [];
+  for (const t of tokens) {
+    if (t.length <= 1) continue;
+    if (SEQUENCE_MARKERS.has(t)) continue;
+    if (ORDER_NOISE.has(t)) continue;
+    seq.push(t);
+  }
+  return seq;
+}
 
 export function extractCriticalLiterals(text: string): CriticalLiterals {
   const s = normalizeWhitespace(text);
@@ -244,12 +363,16 @@ export function extractCriticalLiterals(text: string): CriticalLiterals {
     while (words.length > 1 && TRAILING_STOP.has(words[words.length - 1] as string)) words.pop();
     val = words.join(" ");
     if (!val) continue;
+    // A sequencing marker after the keyword is a clause boundary, not a value.
+    // "the database first, then ..." must not become "database:first", which
+    // would make an ordered instruction and its paraphrase look incompatible.
+    if (words.some((w) => SEQUENCE_MARKERS.has(w))) continue;
     if (VALUE_STOP.has(val) || (/^\d+$/.test(val) && !["port", "version"].includes(key))) continue;
     if (val.length > 80) continue;
     keywords.push(`${key}:${val}`);
   }
 
-  return { numbers: dedupeSort(numbers), mathShapes: dedupeSort(mathShapes), operators, currencies: dedupeSort(currencies), percents: dedupeSort(percents), units: dedupeSort(units), negation: dedupeSort(negation), modality: dedupeSort(modality), paths: dedupeSort(paths), dotted: dedupeSort(dotted), versions: dedupeSort(versions), urls: dedupeSort(urls), hashes: dedupeSort(hashes), identifiers: dedupeSort(identifiers), keywords: dedupeSort(keywords) };
+  return { numbers: dedupeSort(numbers), mathShapes: dedupeSort(mathShapes), operators, currencies: dedupeSort(currencies), percents: dedupeSort(percents), units: dedupeSort(units), negation: dedupeSort(negation), modality: dedupeSort(modality), paths: dedupeSort(paths), dotted: dedupeSort(dotted), versions: dedupeSort(versions), urls: dedupeSort(urls), hashes: dedupeSort(hashes), identifiers: dedupeSort(identifiers), keywords: dedupeSort(keywords), order: extractOrderFingerprint(s) };
 }
 
 /**
@@ -313,7 +436,8 @@ export function criticalLiteralsCompatible(a: string, b: string): boolean {
     sameList(A.urls, B.urls) &&
     sameList(A.hashes, B.hashes) &&
     sameList(A.identifiers, B.identifiers) &&
-    sameList(A.keywords, B.keywords)
+    sameList(A.keywords, B.keywords) &&
+    sameList(A.order, B.order)
   );
 }
 

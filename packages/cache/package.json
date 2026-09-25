@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/cache",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "description": "GrokMax cache fabric: L0-L5 SQLite-backed layered caching.",
   "license": "MIT",
   "type": "module",

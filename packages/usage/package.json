@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/usage",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "description": "Provenance-aware platform usage snapshots with explicit measurement classes.",
   "license": "MIT",
   "type": "module",

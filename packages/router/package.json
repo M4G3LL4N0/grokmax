@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/router",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "description": "GrokMax deterministic-first router with explainable decisions.",
   "license": "MIT",
   "type": "module",

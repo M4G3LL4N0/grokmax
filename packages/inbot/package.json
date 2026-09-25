@@ -1,6 +1,6 @@
 {
   "name": "@grokmax/inbot",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "description": "GrokMax In-Bot Mode: preflight contract that decides before GrokBot spends anything.",
   "license": "MIT",
   "type": "module",

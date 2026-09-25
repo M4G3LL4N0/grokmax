@@ -1,4 +1,4 @@
-export const PROMPT_VERSION = "grokmax-v0.2.0-rc.1";
+export const PROMPT_VERSION = "grokmax-v0.2.0-rc.2";
 
 export const FRESHNESS = {
   IMMUTABLE: "immutable",
