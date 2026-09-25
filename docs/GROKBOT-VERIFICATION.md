@@ -1,5 +1,7 @@
 # GrokMax v0.1.1 — Independent Adversarial Verification (GrokBot)
 
+> **Later candidate (section 13 — does not replace this record):** v0.2.0-rc.1 `e3541d8e80319cdf623f73dea7e1c80d48983fa7` — **READY TO PUBLISH? = NO**. Sections 1–12 and the v0.1.1 scorecard below stay as the historical record, including **CRITICAL F1/F2 at `fd9c017`** and **Gate B 21/22** with bare-operator **`FAIL_UNSAFE_HIT`**.
+
 **Publication decision:** **NOT READY** (`READY TO PUBLISH?` = **NO**)  
 **Verified:** 2026-09-24 ~13:35–13:47 MDT (America/Denver)  
 **Host:** shared box (Matador sync deferred to parent)  
@@ -320,3 +322,272 @@ Path-escape tests **PASS** (**measured**). Gate B bare-operator residual. Preser
 - Gate B fully cleared.
 - Concealment or omission of CRITICAL F1/F2 at `fd9c017`.
 - Counting historical `daeef390` bridge success as this candidate’s live run.
+
+---
+
+# 13. v0.2.0-rc.1 — independent adversarial audit (`e3541d8`)
+
+**Publication decision for this candidate:** **NOT READY** (`READY TO PUBLISH?` = **NO**)  
+**Evidence recorded from:** independent adversarial audit measured 2026-09-24 (America/Denver); claim adjudication `2026-09-24T20:59:44-06:00`  
+**Core candidate:** `e3541d8e80319cdf623f73dea7e1c80d48983fa7` (tag **v0.2.0-rc.1**)  
+**Parent:** `f9a320b8548e7559cbf79f3c2c78be91377eeae7`  
+**Website (read-only):** `b7c047e317dae73f77cb6c883066b9b3dfcfbdf8`  
+**Workdir (audit clone):** `/tmp/grokmax-v02-rc1-verify` · product source **not** modified  
+**Policy:** Trust the attached measured JSON, not commit-message marketing. Prefer false-negative over unsafe hit. Do not invent platform usage. Do not conceal original CRITICAL defects. This section is appended. Sections 1–12 are unchanged historical record.
+
+Machine companion for the current candidate: `benchmarks/results/summary.json` (top-level = this candidate; `history` retains prior SHAs and the full v0.1.1 publication summary).
+
+---
+
+## 13.1 What this section does not erase
+
+The embarrassing record stays visible above and in `benchmarks/results/summary.json` → `history`.
+
+| SHA | What remains on the record | Label |
+|---|---|---|
+| `fd9c017981d5aa96eb36aed6b5ca8da5b578b0f6` | **CRITICAL F1** — L3 hit confidence 1.000 returned `7*8 = 56` for probes `Calculate 50+1` and `Calculate 500+1`. **CRITICAL F2** — negation/budget L3 collision reused the opposite intent (`UNSAFE_F2: true`). Related HIGH F5: `validatePreservation` dropped negation tokens (`ok: true`). | historical, reproduced measured |
+| `daeef3907b512e1dc339b332c15761c08f202eb8` | PR #1 remediation. Bridge job `20260924T120308-1109200-8505` is **historical only** and is not this candidate’s live count. | historical |
+| `42f6da543af04a4eb1adbf4fe11bb82dc2b599cc` (v0.1.1) | Gate B **21/22**, **1 FAIL_UNSAFE_HIT** (bare `Use operator +` ↔ `Use operator *`). `validatePreservation(["budget $50"], "budget $500…")` still **`ok: true`** because `$50` ⊂ `$500`. Tests **163 / 19**. In-Bot and Edge **`NOT_IMPLEMENTED` / `missing_product`**. Website claimed **151 / 18** vs measured **163 / 19**. **READY TO PUBLISH? = NO**. | historical (sections 1–12) |
+| `f9a320b8548e7559cbf79f3c2c78be91377eeae7` | Parent of this candidate. Commit text talks about bare-operator and `$50`/`$500` honesty. **This audit does not treat that commit message as the measurement.** The measurements below are on child `e3541d8`. | parent SHA |
+| Website claim lineage | **151 → 163 → 170 → 279**, as preserved by the audit scorecard. **151** was the site claim at the v0.1.1 audit; **163** was measured then; **279 / 26** is measured on this candidate. **170** is recorded lineage, not re-measured in this refresh. | historical lineage |
+
+Empty `CRITICAL: []` on **this** candidate means no new CRITICAL defect was opened at `e3541d8`. Historical F1/F2 at `fd9c017` remain the baseline record in section 2 and in the table above.
+
+---
+
+## 13.2 Tests and regression (measured)
+
+| Check | Result | Label |
+|---|---|---|
+| `pnpm test` | **279 passed / 26 files / 0 failed** | measured |
+| `pnpm lint` | exit 0 | measured |
+| `pnpm typecheck` | exit 0 | measured |
+| `pnpm install` | exit 0 | measured |
+| F1 `Calculate 50+1` vs `Calculate 500+1` | lookup `probeHit: false`, `compatible: false`, engine `UNSAFE: false` | measured **PASS** |
+| F2 deploy negation and budget `$50` ↔ `$500` (both directions, including “Budget is $50 for the task”) | lookup unsafe count 0, engine unsafe count 0 | measured **PASS** |
+| `validatePreservation(['budget $50'], 'budget $500 for the task')` | **`ok: false`**; lost constraint `budget $50` (token `50`) | measured |
+| `--fresh` after warm L1 hit on `Calculate 17+4` | two `--fresh` runs `cacheLayer: MISS`; no L4/L5 prior | measured **PASS** |
+| Path containment (`../etc`, `../../etc`, `/etc`, encoded dots, symlink escape) | all rejected | measured **PASS** |
+
+The v0.1.1 residual `ok: true` via `$50` ⊂ `$500` is the historical finding in section 4. On `e3541d8` the same class of call measures **`ok: false`**.
+
+---
+
+## 13.3 Gate B
+
+Two different suites. Both measured on `e3541d8`. The v0.1.1 **21/22** failure stays in this table and in sections 4–5.
+
+| Suite | At v0.1.1 `42f6da` (retained) | On `e3541d8` (this audit) |
+|---|---|---|
+| Historical adversarial Gate B (22 cases) | **21/22 PASS**, bare `+`/`*` **FAIL_UNSAFE_HIT** | **22/22 PASS**, unsafe semantic hits **0** |
+| Bare `Use operator +` ↔ `Use operator *` | **FAIL_UNSAFE_HIT** | **PASS_MISS** (`probeHit: false`, `compatible: false`, `reusedSeedEcho: false`, `expectMiss: true`) |
+| Reconstructed threat-pair Gate B | not this row | **42/42 PASS** — 14 `THREAT_PAIRS` × 3 checks (compat false + forward lookup miss + reverse lookup miss); 0 unsafe semantic hits. The “42” figure is that reconstruction; the repo has no separate literal `42` constant. |
+
+---
+
+## 13.4 Edge Mode
+
+**Implemented:** true. **Verified:** true. Real pipeline: `edge` → `engine.run(task, {rawContext})` → `buildEdgeResult`. Package doc observed: Edge Mode is the real GrokMax pipeline.
+
+Reduced live batch only. Failures are not counted as avoidance.
+
+| Scope | Successful eligible avoidance | What is in the fraction |
+|---|---|---|
+| Primary | **2/3** | Exact cold + exact warm avoided. Browser success invoked GrokBot (in the denominator, not the numerator). Safe-paraphrase failure excluded. |
+| With optional math | **4/5** | Optional `9876+5432` cold+warm also avoided. |
+
+| Scenario | Verdict | Notes |
+|---|---|---|
+| A deterministic cold `1234+5678` | **PASS** | route `deterministic`, `grokbotInvoked: false`, `countedAsAvoided: true`, summary `1234+5678 = 6912` |
+| B exact warm | **PASS** | cache hit L0, `countedAsAvoided: true` |
+| C safe paraphrase (“Compute 1234 plus 5678”) | **HONEST_FAIL_NO_GROKBOT** | L3 miss, deterministic resolver did not match, `success: false`, `countedAsAvoided: false`. Not semantic reuse. |
+| D repository / OpenCode | **not_run_missing_tool** | OpenCode CLI absent. `routeReason` / route JSON: `opencode unavailable`. Do not fake success. |
+| E example.com title | **PASS_HANDOFF** | route `grokbot` because **`opencode unavailable`**, `grokbotInvoked: true`, `countedAsAvoided: false`. Audit bridge job `20260924T204627-1286233-3639`. Title `Example Domain`. |
+
+`measurement.platformUsage` is **`unknown`** on every Edge JSON row (hardcoded in `buildEdgeResult`). That field is not a platform-usage measurement.
+
+Caveats that travel with the 2/3 figure: safe-paraphrase fail excluded; OpenCode absent; browser `routeReason` often `opencode unavailable`.
+
+---
+
+## 13.5 In-Bot Mode
+
+**Implemented:** true. **Verified:** true. Skill wrapper is executable (exit 0 and a valid action enum on cache return).
+
+Preflight path observed: `preflight` → `engine.run(task, {dryRunOnly: true})` → `findExistingResult` → `@grokmax/inbot` `preflight()`. `verifyInbotInvocation` pairs a later GrokBot run with a prior `GROKBOT_REQUIRED` preflight.
+
+| Effect | Measured |
+|---|---|
+| `RETURN_EXISTING_RESULT` | `grokbotWorkRequired: false`. Reused `42+7 = 49` from cache. Ledger worker null. Not re-executed. |
+| `DELEGATE` | deterministic delegate, `grokbotWorkRequired: false`, micro-prompt present. Repo/OpenCode and advisory/ChatGPT lanes **FAIL** closed as missing tools — not faked as `DELEGATE`. |
+| `GROKBOT_REQUIRED` | `grokbotWorkRequired: true`. Without a bridge: **FAIL_CLOSED**. With the audit bridge: handoff, job `20260924T204953-1290479-3190`, title `Example Domain`, `countedAsAvoided: false`. |
+| `verifyInbotInvocation` | **`verified: true`** — GrokBot run `95f4ef4c6a6eb0e5` followed `GROKBOT_REQUIRED` preflight task `b93d6e18fbf6ddb2`. Negative checks (delegate preflight, flag mismatch) correctly `verified: false`. |
+
+In-Bot does not mean zero GrokBot. GrokBot must call preflight. `GROKBOT_REQUIRED` still invokes GrokBot.
+
+On the later NATIVE / IN-BOT / EDGE experiment, In-Bot actions observed were `RETURN_EXISTING_RESULT` 2, `DELEGATE` 3, `GROKBOT_REQUIRED` 1 (`grokbotWorkRequired` false on 5, true on 1).
+
+---
+
+## 13.6 Platform usage, ledger, context, external cost
+
+**Cursor platform usage reduction could not be quantified at sufficient resolution.**
+
+| Item | Status | Label |
+|---|---|---|
+| Cursor platform usage | **`not_observable`** | measured absence |
+| Allowed sentence | Cursor platform usage reduction could not be quantified at sufficient resolution. | exact |
+| Why | No billing API in product; no measured_platform before/after pair this audit; Matador offline; Usage & Billing was not browsed (that would contaminate the measurement); no invented token or USD estimates | observed |
+| Ledger vs platform | Separate. Never merge `measured_ledger` with `measured_platform`. Edge `platformUsage` is always `unknown`. | observed |
+| Context | Character proxies only where present. Not billed tokens. | proxy |
+| External cost | **unknown** (no invoice) | unknown |
+
+Experiment ledger rows exist and stay labeled `measured_ledger` (native grokbot used 1 / estimated USD 1.0000; in-bot grokbot used 2 / estimated USD 2.0000, including preflight dry-run rows; edge grokbot used 1 / estimated USD 1.0000). `grokbot-avoided (measured)` on those ledgers is **0**. Estimated USD is not Cursor Usage & Billing.
+
+---
+
+## 13.7 Live GrokBot
+
+Live browser completions in Steps 3, 4, and 6 are **audit bridge only**.
+
+| Field | Value |
+|---|---|
+| Label | **`audit_bridge_not_customer_product`** (also recorded as `measured_audit_bridge`) |
+| What ran | Audit-bridge browser jobs for the example.com title |
+| Completer | Public HTTP fetch (`scripts/bridge-completer.sh`), not a customer desktop GrokBot `computerUse` session |
+| Customer desktop GrokBot | **not** what was measured |
+
+The v0.1.1 live run (section 7, job `20260924T134606-1153001-31567`, `computerUse_box_desktop`) remains that candidate’s historical live count. It is not reclassified as this candidate’s customer-desktop proof.
+
+---
+
+## 13.8 Quality — NATIVE / IN-BOT / EDGE
+
+Controlled experiment, separate database per mode. Cold→warm inside a mode shares that mode’s database. Modes keep separate databases. Product code was not modified. The reduced suite is what ran; full live-v1 stayed blocked.
+
+| | NATIVE | IN-BOT | EDGE |
+|---|---|---|---|
+| Primary success | **3/4** | **3/4** | **3/4** |
+| With optional math | **5/6** | **5/6** | **5/6** |
+
+Primary quality is equal across the three modes: **3/4**. The shared failure is live-v1 **safe-paraphrase** (worded “plus”): deterministic miss, no L3 hit, in **NATIVE, IN-BOT, and EDGE**. It is not counted as savings.
+
+Skipped scenarios:
+
+| Scenario | Label | Reason |
+|---|---|---|
+| long-context small answer | `not_run_missing_tool` | OpenCode CLI absent |
+| repo analysis | `not_run_missing_tool` | OpenCode CLI absent |
+| repo modify (disposable) | `not_run_missing_tool` | OpenCode CLI absent |
+| current research | `not_run` | ChatGPT unset (`GROKMAX_CHATGPT_API_KEY` absent) |
+
+Browser routing in this batch was not cleanly isolated from OpenCode absence: `routeReason` is often `opencode unavailable`, and the task then falls through to `grokbot` when the audit bridge is present.
+
+---
+
+## 13.9 Claim adjudication (Step 11)
+
+**ChatGPT adjudication: unavailable.** Connector was down. The adjudicator is an **independent auditor second-opinion substitute**, not a ChatGPT product. Note recorded with the adjudication: “ChatGPT connector unavailable; adjudication from measured evidence only — not a ChatGPT product.” No material test-plan changes came from ChatGPT. The reduced suite is the one that could be run with OpenCode and ChatGPT absent.
+
+### SAFE PUBLIC CLAIMS
+
+Copied from the audit scorecard / Step 11 tightened wording:
+
+1. 279 tests across 26 files measured locally on e3541d8 (v0.2.0-rc.1), reproducible via pnpm test
+2. Historical adversarial Gate B 22/22 PASS; reconstructed threat-pair Gate B 42/42 PASS; bare +/* PASS_MISS; 0 unsafe semantic hits on e3541d8
+3. Original CRITICAL F1/F2 unsafe cache hits at fd9c017 were reproduced historically and remain PASS on e3541d8
+4. Edge Mode runs the real pipeline (engine.run→buildEdgeResult). On the reduced live batch, 2/3 successful eligible Edge tasks avoided GrokBot (exact cold+warm); failures not counted
+5. In-Bot preflight can RETURN_EXISTING_RESULT or DELEGATE with grokbotWorkRequired=false; GROKBOT_REQUIRED pairs with verifyInbotInvocation. Does not claim zero GrokBot
+6. Public site claiming 279/26 matches measured suite; Modes labeled verification candidate is appropriate until OpenCode lanes complete
+
+### DO NOT CLAIM
+
+Copied from the audit scorecard / Step 11 tightened wording:
+
+1. Do not claim 6/7. Measured reduced suite only: Edge successful-eligible avoidance 2/3 (primary) or 4/5 with optional math
+2. live-v1 safe-paraphrase failed in NATIVE/IN-BOT/EDGE (deterministic miss, no L3 hit). Do not claim paraphrase reuse works
+3. Never claim. GrokBot must call preflight; GROKBOT_REQUIRED still invokes GrokBot
+4. Cursor platform usage reduction could not be quantified at sufficient resolution.
+5. Live browser completions used an audit bridge completer (public HTTP), not a customer desktop GrokBot session
+6. Edge and In-Bot are independently verified for deterministic/cache/preflight/bridge-handoff paths. Repository/OpenCode lanes and ChatGPT advisory lanes were not_run. Browser GrokBot routing was not cleanly isolated from OpenCode absence
+
+Also still do not claim: concealment or omission of CRITICAL F1/F2 at `fd9c017`; that Gate B was “always clear” (the **21/22** bare-operator era is real); that v0.1.1 In-Bot/Edge absence did not happen; that ledger USD is Cursor billing.
+
+---
+
+## 13.10 Findings and blockers on this candidate
+
+**CRITICAL (new, this candidate):** none.
+
+**HIGH (this audit):**
+
+1. live-v1 safe-paraphrase fails all modes — the suite overclaims if published as completable without GrokBot.
+2. OpenCode CLI absent — full live-v1 blocked; browser→grokbot often due to `opencode unavailable`.
+3. `docs/GROKBOT-VERIFICATION.md` in-repo was stale versus measured (**pre-update**). This section and the `summary.json` refresh are that documentation update. The staleness finding stays in the record as what the audit observed before the refresh.
+
+**Smallest remaining blockers:**
+
+| ID | Owner | Blocker |
+|---|---|---|
+| B1 | OpenCode / engineering | Install/configure OpenCode CLI and re-run live-v1 repo + long-context lanes; re-check browser `GROKBOT_REQUIRED` isolation when OpenCode is present |
+| B2 | OpenCode / engineering | Fix or remove live-v1 safe-paraphrase (worded “plus”) so the suite does not claim a path that fails in all modes |
+| B3 | auditor + OpenCode | Refresh `docs/GROKBOT-VERIFICATION.md` and `benchmarks/results/summary.json`, preserving `fd9c017` CRITICAL history and the new v0.2 measurements |
+
+B3 is the documentation refresh this section performs. **B1 and B2 remain open.** **READY TO PUBLISH? = NO.**
+
+---
+
+## 13.11 Evidence roots (audit workspace, not product source)
+
+| Artifact | Path |
+|---|---|
+| Decision memo | `/workspace/grokmax-audit/v02-candidate/chatgpt-decision-memo.json` |
+| Step 1 candidate | `/workspace/grokmax-audit/v02-candidate/STEP1-CANDIDATE.json` |
+| Regression | `/workspace/grokmax-audit/v02-candidate/regression` |
+| Edge | `/workspace/grokmax-audit/v02-candidate/edge` |
+| In-Bot | `/workspace/grokmax-audit/v02-candidate/inbot` |
+| Platform | `/workspace/grokmax-audit/v02-candidate/platform` |
+| Experiment | `/workspace/grokmax-audit/v02-candidate/experiment` |
+| Claim adjudication | `/workspace/grokmax-audit/v02-candidate/STEP11-CLAIM-ADJUDICATION.json` |
+
+---
+
+## SCORECARD — v0.2.0-rc.1
+
+The v0.1.1 scorecard above this section is retained.
+
+### RELEASE CANDIDATE
+v0.2.0-rc.1 @ `e3541d8e80319cdf623f73dea7e1c80d48983fa7` · parent `f9a320b8548e7559cbf79f3c2c78be91377eeae7` · website `b7c047e317dae73f77cb6c883066b9b3dfcfbdf8`
+
+### REGRESSION
+Original **CRITICAL F1/F2 at `fd9c017` remain in the historical record** and measure **PASS** on this candidate (no unsafe cache reuse). Historical adversarial Gate B **22/22**. Threat-pair reconstruction **42/42**. Bare `+`/`*` **PASS_MISS**. `$50` ⊂ `$500` preservation **`ok: false`**. The v0.1.1 era **21/22 FAIL_UNSAFE_HIT** and **`ok: true`** substring residual stay recorded in sections 4–5.
+
+### TESTS
+**279** passed / **26** files / **0** failed (**measured**)
+
+### EDGE
+**implemented + verified**. Successful eligible avoidance **2/3 primary** (**4/5** with optional math). Safe-paraphrase **fail** (excluded from the avoidance numerator). OpenCode **missing** for repository lanes.
+
+### IN-BOT
+**implemented + verified**. `RETURN_EXISTING_RESULT` / `DELEGATE` / `GROKBOT_REQUIRED` observed. `verifyInbotInvocation` **true** on the paired GrokBot handoff. Does not claim zero GrokBot.
+
+### PLATFORM
+**not_observable.** Cursor platform usage reduction could not be quantified at sufficient resolution.
+
+### LIVE GROKBOT
+Audit bridge only (`audit_bridge_not_customer_product`). Public HTTP completer for example.com. Not a customer desktop GrokBot session.
+
+### QUALITY
+Primary **3/4** success, equal across **NATIVE / IN-BOT / EDGE**. Paraphrase fails in all three modes.
+
+### CHATGPT ADJUDICATION
+**Unavailable.** Auditor substitute in Step 11. Not a ChatGPT product.
+
+### COST
+External cost **unknown** (no invoice). Ledger USD is `measured_ledger`, separate from platform.
+
+### READY TO PUBLISH?
+**NO**
+
+### BLOCKERS STILL OPEN
+**B1** OpenCode CLI and repo/long-context lanes. **B2** safe-paraphrase fails in every mode. **B3** is this documentation refresh.
