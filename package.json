@@ -8,11 +8,6 @@
   "engines": {
     "node": ">=24"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  },
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=2 build",
     "lint": "eslint .",
