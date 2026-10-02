@@ -1,5 +1,9 @@
 # GrokMax
 
+<p align="center">
+  <img src="assets/social-card.png" alt="GrokMax" width="100%">
+</p>
+
 **Minimize GrokBot usage while maximizing verified useful output.**
 
 GrokMax is a deterministic-first execution pipeline for GrokBot: it routes every
