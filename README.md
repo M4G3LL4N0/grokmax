@@ -19,6 +19,20 @@ deterministic > api          > chatgpt        > opencode        > grokbot
 zero-cost     > direct tool  > research/cheap > repo work       > persistent/authed
 ```
 
+> ## Release status — read this first
+>
+> `v0.2.0-rc.2` is a **pre-release, and this project's own adversarial audit
+> marks it NOT READY.** That audit is committed at
+> [`docs/GROKBOT-VERIFICATION.md`](docs/GROKBOT-VERIFICATION.md), including a
+> historical CRITICAL finding that was real and a gate that failed 21/22.
+>
+> What is safe to rely on: the deterministic routing pipeline, the five-layer
+> cache, the ledger, and the `doctor` command.
+>
+> What is **not** cleared: live account-savings claims, Edge Mode, and any
+> absolute-cost marketing. Numbers from the pipeline are labelled `measured`,
+> `estimated` or `proxy`, and a proxy is not a bill.
+
 ## Why
 
 GrokBot is the most capable executor — and the most expensive one. Most tasks on
