@@ -1,0 +1,51 @@
+name: bug
+description: Something behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GrokMax separates **measured** from **estimated** from **proxy**. A
+        report that only says "it is wrong" cannot be fixed.
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened instead? Paste real output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Exact commands, smallest input that still shows it.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node and pnpm version
+      placeholder: "node v24.x, pnpm 10.x"
+    validations:
+      required: true
+
+  - type: textarea
+    id: labels
+    attributes:
+      label: Confidence labels in the output
+      description: |
+        Which labels appeared on the numbers in the faulty output —
+        `measured`, `estimated`, `proxy`, or none?
+      placeholder: "measured, proxy"

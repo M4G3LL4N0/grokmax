@@ -1,0 +1,49 @@
+name: enhancement
+description: Propose a change to routing, caching, telemetry, or the ledger
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A strong proposal here usually shows the routing table change and a
+        realistic cost example. GrokMax exists to route work to the cheapest
+        *capable* executor — not the cheapest one.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What does GrokMax currently get wrong or leave unhandled?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: table
+    attributes:
+      label: Routing or cache table impact
+      description: Which layer changes — L0/L1/L2/L3/L4/L5, or the route priority?
+      placeholder: "New L3 semantic family; no change to route priority."
+
+  - type: textarea
+    id: tradeoff
+    attributes:
+      label: Trade-off
+      description: What gets worse, slower, or more expensive if this lands?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This stays provider-neutral (no new hard dependency on one model vendor)
+          required: true
