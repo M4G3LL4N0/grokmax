@@ -1,6 +1,22 @@
 # GrokMax
 
 <p align="center">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="assets/hero/hero-reduced.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/hero/hero-light.svg">
+    <img src="assets/hero/hero-motion.svg" alt="GrokMax — animated project plate showing input &rarr; process &rarr; verify &rarr; output. Motion depicts this project's real state transition." width="100%">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="assets/hero/computational-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/hero/computational-light.svg">
+    <img src="assets/hero/computational-motion.svg" alt="State machine: input &rarr; process &rarr; verify &rarr; output." width="100%">
+  </picture>
+</p>
+
+<p align="center">
   <img src="assets/social-card.png" alt="GrokMax" width="100%">
 </p>
 
