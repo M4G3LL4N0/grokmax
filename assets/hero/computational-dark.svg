@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" width="960" height="300" role="img" aria-label="input to process to verify to output. objective becomes a plan, tools execute, verification resolves.">
+<title>GrokMax — computational sequence</title>
+<desc>A state machine showing the real transition this system performs: input then process then verify then output. Derived from the project architecture, not decorative.</desc>
+<rect width="960" height="300" fill="#0a0d12"/>
+<text x="60" y="52" fill="#f4efe44f" font-size="11.5" letter-spacing="2.6">AGENT_LOOP · QUANT</text>
+<text x="60" y="80" fill="#f4efe4" font-size="19" font-weight="620" letter-spacing="-0.2">objective becomes a plan, tools execute, verification resolves</text>
+<rect x="60.0" y="128" width="190.5" height="54" rx="10" fill="#f4efe4" fill-opacity="0.05" stroke="#f4efe424" stroke-width="1.2" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="0.40s" fill="freeze"/></rect>
+<rect x="60.0" y="128" width="3" height="54" rx="1.5" fill="#f4efe4" opacity="0"><animate attributeName="opacity" from="0" to="0.9" dur="0.5s" begin="0.40s" fill="freeze"/></rect>
+<text x="155.25" y="161" fill="#f4efe4" font-size="12.5" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" opacity="0">input<animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="0.58s" fill="freeze"/></text>
+<line x1="250.5" y1="155.0" x2="276.5" y2="155.0" stroke="#f4efe424" stroke-width="1.2" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0.70s" fill="freeze"/><animate attributeName="stroke" values="#f4efe424;#8fa8e0;#f4efe424" dur="6s" repeatCount="indefinite"/></line>
+<rect x="276.5" y="128" width="190.5" height="54" rx="10" fill="#f4efe4" fill-opacity="0.05" stroke="#f4efe424" stroke-width="1.2" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="0.95s" fill="freeze"/></rect>
+<rect x="276.5" y="128" width="3" height="54" rx="1.5" fill="#f4efe4" opacity="0"><animate attributeName="opacity" from="0" to="0.9" dur="0.5s" begin="0.95s" fill="freeze"/></rect>
+<text x="371.75" y="161" fill="#f4efe4" font-size="12.5" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" opacity="0">process<animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.13s" fill="freeze"/></text>
+<line x1="467.0" y1="155.0" x2="493.0" y2="155.0" stroke="#f4efe424" stroke-width="1.2" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="1.25s" fill="freeze"/><animate attributeName="stroke" values="#f4efe424;#8fa8e0;#f4efe424" dur="6s" repeatCount="indefinite"/></line>
+<rect x="493.0" y="128" width="190.5" height="54" rx="10" fill="#f4efe4" fill-opacity="0.05" stroke="#8fa8e0" stroke-width="1.2" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.50s" fill="freeze"/></rect>
+<rect x="493.0" y="128" width="3" height="54" rx="1.5" fill="#8fa8e0" opacity="0"><animate attributeName="opacity" from="0" to="0.9" dur="0.5s" begin="1.50s" fill="freeze"/></rect>
+<text x="588.25" y="161" fill="#f4efe4" font-size="12.5" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" opacity="0">verify<animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.68s" fill="freeze"/></text>
+<line x1="683.5" y1="155.0" x2="709.5" y2="155.0" stroke="#f4efe424" stroke-width="1.2" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="1.80s" fill="freeze"/><animate attributeName="stroke" values="#f4efe424;#8fa8e0;#f4efe424" dur="6s" repeatCount="indefinite"/></line>
+<rect x="709.5" y="128" width="190.5" height="54" rx="10" fill="#f4efe4" fill-opacity="0.05" stroke="#f4efe424" stroke-width="1.2" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="2.05s" fill="freeze"/></rect>
+<rect x="709.5" y="128" width="3" height="54" rx="1.5" fill="#e7c27a" opacity="0"><animate attributeName="opacity" from="0" to="0.9" dur="0.5s" begin="2.05s" fill="freeze"/></rect>
+<text x="804.75" y="161" fill="#f4efe4" font-size="12.5" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" opacity="0">output<animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="2.23s" fill="freeze"/></text>
+</svg>
