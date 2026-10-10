@@ -1,275 +1,101 @@
-# GrokMax
+# grokmax
 
-<p align="center">
-  <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="assets/hero/hero-reduced.svg">
-    <source media="(prefers-color-scheme: light)" srcset="assets/hero/hero-light.svg">
-    <img src="assets/hero/hero-motion.svg" alt="GrokMax — animated project plate showing input &rarr; process &rarr; verify &rarr; output. Motion depicts this project's real state transition." width="100%">
-  </picture>
-</p>
+> Scale down before you scale up. Built in TypeScript. 16 entry points (index.ts). Live at grokmax.noaerth.com.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="assets/hero/computational-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="assets/hero/computational-light.svg">
-    <img src="assets/hero/computational-motion.svg" alt="State machine: input &rarr; process &rarr; verify &rarr; output." width="100%">
-  </picture>
-</p>
+The implementation summary below is intentionally conservative. Claims from NORTHSTAR are not presented as shipped functionality.
 
-<p align="center">
-  <img src="assets/social-card.png" alt="GrokMax" width="100%">
-</p>
+- [GitHub repository](https://github.com/M4G3LL4N0/grokmax)
+- [Project site](https://grokmax.noaerth.com)
 
-**Minimize GrokBot usage while maximizing verified useful output.**
+<!-- NOAERTH_IMAGE_SLOT: grokmax/hero -->
 
-GrokMax is a deterministic-first execution pipeline for GrokBot: it routes every
-task to the cheapest capable executor, slims the context to what matters, and
-caches the result across five layers so nothing is paid for twice.
+## What it is
 
-```text
-TASK -> normalize -> fingerprint -> L0/L1 exact -> L2 normalized -> L3 semantic
-     -> L4 artifact -> L5 knowledge -> slice context -> compile micro-prompt
-     -> route -> execute -> compress -> save cache/artifact -> ledger
-```
+Scale down before you scale up. Built in TypeScript. 16 entry points (index.ts). Live at grokmax.noaerth.com.
 
-Route priority (mission order):
+This repository is part of the NOAERTH venture ecosystem. The current public-facing evidence identifies it as a early-stage project rather than a production-ready system.
 
-```text
-deterministic > api          > chatgpt        > opencode        > grokbot
-zero-cost     > direct tool  > research/cheap > repo work       > persistent/authed
-```
+## Capabilities
 
-> ## Release status — read this first
->
-> `v0.2.0-rc.2` is a **pre-release, and this project's own adversarial audit
-> marks it NOT READY.** That audit is committed at
-> [`docs/GROKBOT-VERIFICATION.md`](docs/GROKBOT-VERIFICATION.md), including a
-> historical CRITICAL finding that was real and a gate that failed 21/22.
->
-> What is safe to rely on: the deterministic routing pipeline, the five-layer
-> cache, the ledger, and the `doctor` command.
->
-> What is **not** cleared: live account-savings claims, Edge Mode, and any
-> absolute-cost marketing. Numbers from the pipeline are labelled `measured`,
-> `estimated` or `proxy`, and a proxy is not a bill.
+### Available evidence
 
-## Why
+- The repository contains the implementation and documentation associated with the project description above.
+- The technology signals currently visible in the local project are listed in the technical notes below.
+- No additional capability is asserted here without a direct implementation reference.
 
-GrokBot is the most capable executor — and the most expensive one. Most tasks on
-any given day are not GrokBot-only tasks. They are:
+### Experimental or planned
 
-- math (`Calculate 7*8`), hashing (`sha256 of …`), file counts, `git status`
-- cached answers to questions asked yesterday
-- repository edits that any capable coding agent can do more cheaply
-- lookups a direct API does in milliseconds
+Roadmap intent is deliberately not represented as shipped functionality. Review NORTHSTAR and source implementation together before adding future-facing claims.
 
-GrokMax catches those *before* they become GrokBot invocations.
+<!-- NOAERTH_IMAGE_SLOT: grokmax/workflow -->
 
-## Key properties
+## How it works
 
-| Property | What it means |
-| --- | --- |
-| Deterministic-first | Zero-cost local executors handle math/hash/count/git before anything costs money. |
-| 5-layer cache | L1 exact, L2 normalized, L3 semantic, L4 artifact, L5 durable knowledge. |
-| Context slicing | Sends ~1,500 relevant tokens instead of 20,000. Reductions are a **proxy** for token cost, never a billed measurement. |
-| Constraint preservation | Hard constraints survive verbatim into the final prompt; `validatePreservation` flags any loss. |
-| Budget ceilings | `maxCostUsd` and `maxGrokBotUsage` are hard ceilings. Over-budget GrokBot routes refuse rather than pretend. |
-| Honest telemetry | Every number is labeled **measured / estimated / proxy** in the ledger. Savings are proxies unless imported from live measurement. |
-| Graceful degradation | No provider, no problem — routing returns `none` and the pipeline reports it plainly. |
+The current evidence supports a repository-level application or tool workflow, but does not provide enough verified detail in the Part 1 record to publish a component-level architecture diagram. The architecture slot is reserved for a deterministic diagram after the source flow is reviewed.
+
+<!-- NOAERTH_IMAGE_SLOT: grokmax/architecture -->
 
 ## Quick start
 
-Requirements: Node **>= 24** (uses `node:sqlite`), `pnpm` 8+.
+### Prerequisites
+
+- A runtime suitable for `Node.js`.
+- A clean checkout of this repository.
+
+### Install
 
 ```sh
-git clone https://github.com/M4G3LL4N0/grokmax.git
-cd grokmax
 pnpm install
-pnpm cli doctor          # health check across every subsystem
-pnpm cli benchmark       # measured on THIS machine; deterministic-only, no spend
 ```
+
+### Run locally
 
 ```sh
-pnpm cli optimize "Calculate 7*8 and return the integer result"
-# ROUTE  DETERMINISTIC
-# ...    7*8 = 56   (zero cost, cached for the next identical ask)
-
-pnpm cli route "Refactor the scheduler module and add tests"
-# ROUTE  OPENCODE
-# GROKBOT not required
-
-pnpm cli dry-run "Fix the typecheck error in src/main.ts"
-# ROUTE  OPENCODE   -> SKIPPED  (plan only; nothing executed)
-
-pnpm cli savings
-# honest report across your ledger runs (proxy unless measured)
+Use the repository's documented entry point after installing dependencies.
 ```
 
-## CLI reference
+### Build
 
-| Command | Description |
-| --- | --- |
-| `grokmax optimize "<goal>"` | Full pipeline: plan + outcome. |
-| `grokmax run <intent> <goal>` | Explicit intent + goal. |
-| `grokmax ask "<question>"` | Shorthand: intent = goal = question. |
-| `grokmax edge "<task>"` | Edge Mode: complete the work before GrokBot. See [docs/EDGE-MODE.md](docs/EDGE-MODE.md). |
-| `grokmax preflight "<task>"` | In-Bot preflight contract for the GrokBot skill. See [docs/INBOT-MODE.md](docs/INBOT-MODE.md). |
-| `grokmax route "<goal>"` | Routing decision only (never executes). |
-| `grokmax dry-run "<goal>"` | Plan without executing anything. |
-| `grokmax explain <runId>` | Inspect a specific run in the ledger. |
-| `grokmax cache stats\|prune\|clear` | Cache health / maintenance. |
-| `grokmax usage` | Ledger summary, honestly labeled. |
-| `grokmax usage snapshot add\|list\|diff` | Provenance-aware platform usage observations. See [docs/PLATFORM-MEASUREMENT.md](docs/PLATFORM-MEASUREMENT.md). |
-| `grokmax experiment create\|record\|report` | Reproducible live experiment sessions. See [docs/LIVE-BENCHMARK.md](docs/LIVE-BENCHMARK.md). |
-| `grokmax bench manifest\|compare\|assert-cold\|reset-fixture` | Benchmark manifests and contamination guards. |
-| `grokmax savings` | Savings report (`--json` for machine-readable). |
-| `grokmax benchmark` | Run fixture suites, measured locally. |
-| `grokmax doctor` | Health checks across every subsystem. |
-| `grokmax status` | One-view aggregate (doctor + cache + ledger + savings). |
-
-Add `--json` to any command for machine-readable output. By default the
-database lives at `data/grokmax.db`; override with `GROKMAX_DB`.
-
-## Repo layout
-
-```text
-app/
-  cli/              commander-based CLI (optimize/run/ask/route/dry-run/benchmark/doctor/…)
-packages/
-  core/             engine, types, normalize, fingerprint, pipeline
-  cache/            SQLite-backed L0–L5 cache fabric
-  adapters/         provider adapters (deterministic/opencode/chatgpt/grokbot/api)
-  context/          context slicer
-  compiler/         micro-prompt compiler + constraint preservation
-  router/           deterministic-first router + cost model
-  ledger/           usage ledger with honest measurement labels
-  artifacts/        L4 artifact store + L5 knowledge store
-  providers/        provider contracts + registry
-  telemetry/        honest savings computation
-  doctor/           subsystem health checks
-benchmarks/
-  suites/           5 fixture categories, 33 tasks (math / repo / hash / files / escape)
-skills/
-  grokmax/SKILL.md  the reusable GrokBot skill
+```sh
+pnpm run build
 ```
 
-## Honesty policy
+### Test
 
-This project’s integrity is its product. Savings numbers are:
+```sh
+pnpm run test
+```
 
-- **measured** – only when manually imported from live usage observation.
-- **estimated** – cost/token estimates marked as such everywhere.
-- **proxy** – router-level avoided-GrokBot counts and context reductions.
-  Useful, directional, and never presented as platform-anonymous measurements.
+Commands are included only when they were detected in the repository manifest; verify environment-specific requirements before deployment.
 
-## Roadmap
+## Technical notes
 
-- [x] Monorepo + 11 subsystem packages
-- [x] CLI, doctor, benchmark, honest telemetry
-- [x] Reusable GrokBot skill
-- [ ] REPL / daemon mode
-- [ ] Live GrokBot usage import (manual measured bridge)
+- **Primary language:** JavaScript/TypeScript
+- **Runtime:** Node.js
+- **Package manager:** pnpm
+- **Framework and integration signals:** Go, Rust
+- **Entry-point signals:** package.json
+- **Test evidence:** vitest.config.ts
+- **Repository topics:** `typescript`, `apps`, `benchmark`, `cache`, `cli`, `dung30n5`, `live`, `noaerth`
 
-## License
+## Status and roadmap
 
-MIT. See [LICENSE](LICENSE).
+**Current status:** Early-stage project.
 
-<!-- TRILLIONX:presentation:begin -->
+**Current:** The repository and its documented implementation are available for inspection.
 
-### Animated surfaces
+**Next:** Reconcile the README, source behavior, and safe public product language before adding deeper examples or diagrams.
 
-Generated from this repository's own source tree: every count, route and module below was measured, not written by hand.
+**Future:** Product direction is maintained separately and must not be read as a shipped feature list.
 
-#### Identity
+## Contributing and license
 
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/hero-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/hero-light.svg">
-  <img alt="Identity diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/hero-motion.svg">
-</picture>
+Follow the repository's existing contribution and licensing files where present. This README does not invent an open-source license or contribution policy.
 
-#### Entry points
+## Visual documentation
 
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/terminal-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/terminal-light.svg">
-  <img alt="Entry points diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/terminal-motion.svg">
-</picture>
+Image slots are intentionally comments until authentic screenshots, deterministic diagrams, or approved conceptual visuals exist. No absent image file is referenced.
 
-#### Modules
+## NOAERTH
 
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/architecture-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/architecture-light.svg">
-  <img alt="Modules diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/architecture-motion.svg">
-</picture>
-
-#### Primitives
-
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/state_machine-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/state_machine-light.svg">
-  <img alt="Primitives diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/state_machine-motion.svg">
-</picture>
-
-#### Composition
-
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/component_map-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/component_map-light.svg">
-  <img alt="Composition diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/component_map-motion.svg">
-</picture>
-
-#### Build and tests
-
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/build-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/build-light.svg">
-  <img alt="Build and tests diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/build-motion.svg">
-</picture>
-
-#### Workflow
-
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/workflow-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/workflow-light.svg">
-  <img alt="Workflow diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/workflow-motion.svg">
-</picture>
-
-#### Domain
-
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/domain-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/domain-light.svg">
-  <img alt="Domain diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/domain-motion.svg">
-</picture>
-
-#### Identity object
-
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/footer-reduced.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/footer-light.svg">
-  <img alt="Identity object diagram for grokmax" src="https://raw.githubusercontent.com/M4G3LL4N0/grokmax/main/.github-art/surfaces/footer-motion.svg">
-</picture>
-
-<!-- TRILLIONX:presentation:end -->
-
-<!-- TRILLIONX:evidence:begin -->
-
-## What is measurable here
-
-Generated by `.github-art` from the source tree at publish time.
-
-| Signal | Value |
-| --- | --- |
-| HTTP routes | 0 |
-| Entry points | 16 |
-| Module roots | 16 |
-| Test files | 26 |
-| CI workflows | 1 |
-| Distinctive stack | scaffold only |
-| Status | LIVE |
-| Evidence confidence | E3 |
-| Animated surfaces | 9 |
-
-<!-- TRILLIONX:evidence:end -->
+[NOAERTH](https://www.noaerth.com) is the venture ecosystem associated with this project.
